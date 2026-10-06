@@ -1614,7 +1614,7 @@ function BarChangeScreen({
         <ScreenHeading
           eyebrow="THEORETICAL GEOMETRY"
           title="Theoretical Bar Change"
-          description="Move any upper or lower pin through the bracket holes and see the resulting geometry instantly."
+          description="Move any upper or lower bar through the bracket holes and see the resulting geometry instantly."
         />
 
         <label className="compact-setting">
@@ -1640,7 +1640,7 @@ function BarChangeScreen({
           <div className="bracket-section-heading">
             <div>
               <p className="eyebrow">UPPER LINK</p>
-              <h2>Pin Position</h2>
+              <h2>Bar Position</h2>
             </div>
 
             <span>
@@ -1689,7 +1689,7 @@ function BarChangeScreen({
           <div className="bracket-section-heading">
             <div>
               <p className="eyebrow">LOWER LINK</p>
-              <h2>Pin Position</h2>
+              <h2>Bar Position</h2>
             </div>
           </div>
 
