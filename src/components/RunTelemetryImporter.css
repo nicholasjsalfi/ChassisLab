@@ -1,0 +1,113 @@
+.run-telemetry-importer {
+  display: grid;
+  gap: 9px;
+  margin: 0 0 12px;
+  padding: 11px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.run-telemetry-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.run-telemetry-heading > div {
+  min-width: 0;
+}
+
+.run-telemetry-heading span,
+.run-telemetry-loaded strong,
+.run-telemetry-loaded span {
+  display: block;
+}
+
+.run-telemetry-heading > div > span {
+  color: var(--text);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.run-telemetry-heading small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted-2);
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+.run-import-button {
+  position: relative;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--blue-soft);
+  background: var(--panel-deep);
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.run-import-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.run-telemetry-loaded {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  background: var(--panel-deep);
+  border-radius: 7px;
+}
+
+.run-telemetry-loaded strong {
+  font-size: 9px;
+}
+
+.run-telemetry-loaded span {
+  margin-top: 2px;
+  color: var(--muted-2);
+  font-size: 8px;
+}
+
+.run-telemetry-loaded button {
+  min-height: 30px;
+  padding: 0 8px;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 8px;
+}
+
+.run-telemetry-message {
+  margin: 0;
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.45;
+}
+
+@media (max-width: 560px) {
+  .run-telemetry-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .run-import-button {
+    justify-content: center;
+  }
+}

@@ -1,117 +1,64 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
+  type ChangeEvent,
   type FormEvent,
+  type MouseEvent,
 } from "react";
 import "./App.css";
+import { parseTelemetryFile } from "./telemetry/dragy";
+import type {
+  CalcResult,
+  Car,
+  DragyPoint,
+  Inputs,
+  LadderCalcResult,
+  LadderInputs,
+  LadderResult,
+  NumericInputs,
+  RunLog,
+  RunTelemetry,
+  SavedSetup,
+  SuccessfulResult,
+  SuspensionType,
+  Tab,
+  ThemePreference,
+  WeightData,
+} from "./types";
+import { RunTelemetryImporter } from "./components/RunTelemetryImporter";
+import { CloudAccountPanel } from "./components/CloudAccountPanel";
+import { useCloudGarageSync } from "./cloud/useCloudGarageSync";
+import {
+  calculateDynamicCg,
+  calculateFourLink,
+  calculateLadderBar,
+  getRearBiasString,
+  getWeightData,
+  parseNumber,
+  toLadderInputs,
+  toNumericInputs,
+} from "./calculations/geometry";
+import {
+  getModelGeometryAtTravel,
+  simulateModelState,
+  type ModelSnapshot,
+} from "./calculations/modeling";
+import {
+  ACTIVE_CAR_STORAGE_KEY,
+  CARS_STORAGE_KEY,
+  DEFAULT_HOLE_SPACING,
+  LEGACY_ACTIVE_CAR_STORAGE_KEY,
+  emptyInputs,
+  loadCarsFromLocalStorage,
+  makeId,
+  normalizeInputs,
+} from "./storage/garageData";
 
 /* =========================================================
-   TYPES
+   LOCAL UI TYPES
 ========================================================= */
-
-type SuspensionType = "4-link" | "ladder-bar";
-type Tab = "calculator" | "bar-change" | "dynamic" | "garage";
-type ThemePreference = "system" | "dark" | "light";
-
-type Inputs = {
-  upperLength: string;
-  upperFrontHeight: string;
-  upperRearHeight: string;
-  lowerLength: string;
-  lowerFrontHeight: string;
-  lowerRearHeight: string;
-
-  ladderLength: string;
-  ladderFrontHeight: string;
-
-  wheelbase: string;
-  cgHeight: string;
-  tireDiameter: string;
-};
-
-type NumericInputs = {
-  upperLength: number;
-  upperFrontHeight: number;
-  upperRearHeight: number;
-  lowerLength: number;
-  lowerFrontHeight: number;
-  lowerRearHeight: number;
-  wheelbase: number;
-  cgHeight: number;
-  tireDiameter: number;
-};
-
-type LadderInputs = {
-  ladderLength: number;
-  ladderFrontHeight: number;
-  wheelbase: number;
-  cgHeight: number;
-  tireDiameter: number;
-};
-
-type LadderResult = {
-  horizontalRun: number;
-  barAngle: number;
-  icLength: number;
-  icHeight: number;
-  antiSquat: number;
-};
-
-type LadderCalcResult =
-  | LadderResult
-  | { error: string }
-  | null;
-
-type SuccessfulResult = {
-  upperRun: number;
-  lowerRun: number;
-  upperAngle: number;
-  lowerAngle: number;
-  upperSlope: number;
-  lowerSlope: number;
-  icLength: number;
-  icHeight: number;
-  antiSquat: number;
-};
-
-type CalcResult =
-  | SuccessfulResult
-  | { error: string }
-  | null;
-
-type RunLog = {
-  id: string;
-  createdAt: string;
-  trackSurface: string;
-  frontRebound: string;
-  frontCompression: string;
-  rearRebound: string;
-  rearCompression: string;
-  rearTirePressure: string;
-  rearWeightBias: string;
-  sixtyFoot: string;
-  threeThirty: string;
-  eighthEt: string;
-  eighthMph: string;
-  notes: string;
-};
-
-type SavedSetup = {
-  id: string;
-  name: string;
-  createdAt: string;
-  inputs: Inputs;
-  runs?: RunLog[];
-};
-
-type Car = {
-  id: string;
-  name: string;
-  suspensionType: SuspensionType;
-  calculatorInputs: Inputs;
-  savedSetups: SavedSetup[];
-};
 
 type BracketOffsets = {
   upperFront: number;
@@ -124,312 +71,11 @@ type BracketOffsets = {
    CONSTANTS
 ========================================================= */
 
-const emptyInputs: Inputs = {
-  upperLength: "",
-  upperFrontHeight: "",
-  upperRearHeight: "",
-  lowerLength: "",
-  lowerFrontHeight: "",
-  lowerRearHeight: "",
-
-  ladderLength: "",
-  ladderFrontHeight: "",
-
-  wheelbase: "",
-  cgHeight: "",
-  tireDiameter: "",
-};
-
-const CARS_STORAGE_KEY = "chassislab-cars";
-const LEGACY_CARS_STORAGE_KEY = "drag-suspension-cars";
-
-const ACTIVE_CAR_STORAGE_KEY = "chassislab-active-car";
-const LEGACY_ACTIVE_CAR_STORAGE_KEY =
-  "drag-suspension-active-car";
-
 const THEME_STORAGE_KEY = "chassislab-theme";
 
 /* =========================================================
    HELPERS / CALCULATION ENGINE
 ========================================================= */
-
-function makeId() {
-  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
-function parseNumber(value: string | undefined) {
-  if (value === undefined || value.trim() === "") {
-    return NaN;
-  }
-
-  return Number(value);
-}
-
-function toNumericInputs(inputs: Inputs): NumericInputs {
-  return {
-    upperLength: parseNumber(inputs.upperLength),
-    upperFrontHeight: parseNumber(inputs.upperFrontHeight),
-    upperRearHeight: parseNumber(inputs.upperRearHeight),
-    lowerLength: parseNumber(inputs.lowerLength),
-    lowerFrontHeight: parseNumber(inputs.lowerFrontHeight),
-    lowerRearHeight: parseNumber(inputs.lowerRearHeight),
-    wheelbase: parseNumber(inputs.wheelbase),
-    cgHeight: parseNumber(inputs.cgHeight),
-    tireDiameter: parseNumber(inputs.tireDiameter),
-  };
-}
-
-function toLadderInputs(inputs: Inputs): LadderInputs {
-  return {
-    ladderLength: parseNumber(inputs.ladderLength),
-    ladderFrontHeight: parseNumber(
-      inputs.ladderFrontHeight
-    ),
-    wheelbase: parseNumber(inputs.wheelbase),
-    cgHeight: parseNumber(inputs.cgHeight),
-    tireDiameter: parseNumber(inputs.tireDiameter),
-  };
-}
-
-function calculateLadderBar(
-  n: LadderInputs
-): LadderCalcResult {
-  const required = [
-    n.ladderLength,
-    n.ladderFrontHeight,
-    n.wheelbase,
-    n.cgHeight,
-    n.tireDiameter,
-  ];
-
-  if (required.some((value) => !Number.isFinite(value))) {
-    return null;
-  }
-
-  if (
-    n.ladderLength <= 0 ||
-    n.wheelbase <= 0 ||
-    n.cgHeight <= 0 ||
-    n.tireDiameter <= 0
-  ) {
-    return {
-      error:
-        "Ladder-bar length, wheelbase, CG height, and tire diameter must be greater than zero.",
-    };
-  }
-
-  const axleHeight = n.tireDiameter / 2;
-  const verticalDifference =
-    n.ladderFrontHeight - axleHeight;
-
-  if (
-    Math.abs(verticalDifference) >= n.ladderLength
-  ) {
-    return {
-      error:
-        "The ladder-bar length must be longer than the vertical difference between the axle center and front mounting point.",
-    };
-  }
-
-  const horizontalRun = Math.sqrt(
-    n.ladderLength ** 2 -
-      verticalDifference ** 2
-  );
-
-  const barAngle =
-    Math.atan2(
-      verticalDifference,
-      horizontalRun
-    ) *
-    (180 / Math.PI);
-
-  const icLength = horizontalRun;
-  const icHeight = n.ladderFrontHeight;
-
-  if (Math.abs(icLength) < 0.000001) {
-    return {
-      error:
-        "Instant center length is too close to zero to calculate anti-squat.",
-    };
-  }
-
-  const antiSquat =
-    ((icHeight * n.wheelbase) /
-      (icLength * n.cgHeight)) *
-    100;
-
-  return {
-    horizontalRun,
-    barAngle,
-    icLength,
-    icHeight,
-    antiSquat,
-  };
-}
-
-function normalizeInputs(
-  inputs: Partial<Inputs> | undefined
-): Inputs {
-  return {
-    ...emptyInputs,
-    ...(inputs ?? {}),
-  };
-}
-
-function normalizeCars(value: unknown): Car[] {
-  if (!Array.isArray(value)) return [];
-
-  return value.map((car) => {
-    const raw = car as Partial<Car>;
-
-    return {
-      id: raw.id ?? makeId(),
-      name: raw.name ?? "Untitled Car",
-      suspensionType:
-        raw.suspensionType === "ladder-bar"
-          ? "ladder-bar"
-          : "4-link",
-      calculatorInputs: normalizeInputs(
-        raw.calculatorInputs
-      ),
-      savedSetups: Array.isArray(raw.savedSetups)
-        ? raw.savedSetups.map((setup) => ({
-            ...setup,
-            inputs: normalizeInputs(setup.inputs),
-            runs: (setup.runs ?? []).map((run) => ({
-              ...run,
-              rearWeightBias: run.rearWeightBias ?? "",
-            })),
-          }))
-        : [],
-    };
-  });
-}
-
-function calculateFourLink(n: NumericInputs): CalcResult {
-  const required = [
-    n.upperLength,
-    n.upperFrontHeight,
-    n.upperRearHeight,
-    n.lowerLength,
-    n.lowerFrontHeight,
-    n.lowerRearHeight,
-    n.wheelbase,
-    n.cgHeight,
-  ];
-
-  if (required.some((value) => !Number.isFinite(value))) {
-    return null;
-  }
-
-  if (
-    n.upperLength <= 0 ||
-    n.lowerLength <= 0 ||
-    n.wheelbase <= 0 ||
-    n.cgHeight <= 0
-  ) {
-    return {
-      error:
-        "Lengths, wheelbase, and CG height must be greater than zero.",
-    };
-  }
-
-  const upperRise =
-    n.upperFrontHeight - n.upperRearHeight;
-
-  const lowerRise =
-    n.lowerFrontHeight - n.lowerRearHeight;
-
-  if (
-    Math.abs(upperRise) >= n.upperLength ||
-    Math.abs(lowerRise) >= n.lowerLength
-  ) {
-    return {
-      error:
-        "A bar length must be longer than the vertical difference between its mounting points.",
-    };
-  }
-
-  const upperRun = Math.sqrt(
-    n.upperLength ** 2 - upperRise ** 2
-  );
-
-  const lowerRun = Math.sqrt(
-    n.lowerLength ** 2 - lowerRise ** 2
-  );
-
-  const upperSlope = upperRise / upperRun;
-  const lowerSlope = lowerRise / lowerRun;
-  const denominator = upperSlope - lowerSlope;
-
-  if (Math.abs(denominator) < 0.000001) {
-    return {
-      error:
-        "The upper and lower links are parallel or nearly parallel, so there is no usable finite instant center.",
-    };
-  }
-
-  const icLength =
-    (n.lowerRearHeight - n.upperRearHeight) /
-    denominator;
-
-  const icHeight =
-    n.upperRearHeight + upperSlope * icLength;
-
-  const upperAngle =
-    Math.atan2(upperRise, upperRun) * (180 / Math.PI);
-
-  const lowerAngle =
-    Math.atan2(lowerRise, lowerRun) * (180 / Math.PI);
-
-  if (Math.abs(icLength) < 0.000001) {
-    return {
-      error:
-        "Instant center length is too close to zero to calculate anti-squat.",
-    };
-  }
-
-  const antiSquat =
-    ((icHeight * n.wheelbase) /
-      (icLength * n.cgHeight)) *
-    100;
-
-  return {
-    upperRun,
-    lowerRun,
-    upperAngle,
-    lowerAngle,
-    upperSlope,
-    lowerSlope,
-    icLength,
-    icHeight,
-    antiSquat,
-  };
-}
-
-function loadCars(): Car[] {
-  try {
-    const current = localStorage.getItem(CARS_STORAGE_KEY);
-
-    if (current) {
-      const parsed = JSON.parse(current);
-      return normalizeCars(parsed);
-    }
-
-    const legacy = localStorage.getItem(
-      LEGACY_CARS_STORAGE_KEY
-    );
-
-    if (legacy) {
-      const parsed = JSON.parse(legacy);
-      return normalizeCars(parsed);
-    }
-
-    return [];
-  } catch {
-    return [];
-  }
-}
 
 function loadTheme(): ThemePreference {
   const stored = localStorage.getItem(THEME_STORAGE_KEY);
@@ -450,13 +96,17 @@ function loadTheme(): ThemePreference {
 ========================================================= */
 
 function App() {
-  const [cars, setCars] = useState<Car[]>(loadCars);
+  const [cars, setCars] = useState<Car[]>(loadCarsFromLocalStorage);
   const [activeTab, setActiveTab] =
     useState<Tab>("calculator");
   const [showAddCar, setShowAddCar] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [theme, setTheme] =
     useState<ThemePreference>(loadTheme);
+
+  const cloud = useCloudGarageSync(cars, setCars);
+  const [modelTelemetry, setModelTelemetry] =
+    useState<RunTelemetry | null>(null);
 
   const [activeCarId, setActiveCarId] =
     useState<string | null>(() => {
@@ -530,6 +180,12 @@ function App() {
     }
   }, [cars, activeCarId]);
 
+  useEffect(() => {
+    if (navigator.storage?.persist) {
+      navigator.storage.persist().catch(() => undefined);
+    }
+  }, []);
+
   const activeCar =
     cars.find((car) => car.id === activeCarId) ?? null;
 
@@ -542,11 +198,13 @@ function App() {
       name,
       suspensionType,
       calculatorInputs: { ...emptyInputs },
+      holeSpacing: DEFAULT_HOLE_SPACING,
       savedSetups: [],
     };
 
     setCars((current) => [...current, newCar]);
     setActiveCarId(newCar.id);
+    setModelTelemetry(null);
     setActiveTab("calculator");
     setShowAddCar(false);
   }
@@ -566,6 +224,18 @@ function App() {
     );
   }
 
+  function updateActiveCarHoleSpacing(value: string) {
+    if (!activeCarId) return;
+
+    setCars((current) =>
+      current.map((car) =>
+        car.id === activeCarId
+          ? { ...car, holeSpacing: value }
+          : car
+      )
+    );
+  }
+
   function saveCurrentSetup() {
     if (!activeCar) return;
 
@@ -578,6 +248,8 @@ function App() {
       name: name.trim(),
       createdAt: new Date().toISOString(),
       inputs: { ...activeCar.calculatorInputs },
+      holeSpacing:
+        activeCar.holeSpacing || DEFAULT_HOLE_SPACING,
       runs: [],
     };
 
@@ -599,13 +271,16 @@ function App() {
         car.id === carId
           ? {
               ...car,
-              calculatorInputs: { ...setup.inputs },
+              calculatorInputs: { ...normalizeInputs(setup.inputs) },
+              holeSpacing:
+                setup.holeSpacing || DEFAULT_HOLE_SPACING,
             }
           : car
       )
     );
 
     setActiveCarId(carId);
+    setModelTelemetry(null);
     setActiveTab("calculator");
   }
 
@@ -713,6 +388,30 @@ function App() {
     );
   }
 
+  function modelRun(
+    carId: string,
+    setup: SavedSetup,
+    run: RunLog
+  ) {
+    if (!run.telemetry) return;
+
+    setCars((current) =>
+      current.map((car) =>
+        car.id === carId
+          ? {
+              ...car,
+              calculatorInputs: { ...normalizeInputs(setup.inputs) },
+              holeSpacing: setup.holeSpacing || DEFAULT_HOLE_SPACING,
+            }
+          : car
+      )
+    );
+
+    setActiveCarId(carId);
+    setModelTelemetry(run.telemetry);
+    setActiveTab("modeling");
+  }
+
   function deleteCar(carId: string) {
     const car = cars.find(
       (candidate) => candidate.id === carId
@@ -738,6 +437,7 @@ function App() {
           ? remainingCars[0].id
           : null
       );
+      setModelTelemetry(null);
     }
   }
 
@@ -754,6 +454,7 @@ function App() {
           <SettingsPanel
             theme={theme}
             onThemeChange={setTheme}
+            cloud={cloud}
             onClose={() => setShowSettings(false)}
           />
         )}
@@ -808,11 +509,18 @@ function App() {
         )}
 
         {activeTab === "bar-change" && (
-          <BarChangeScreen car={activeCar} />
+          <BarChangeScreen
+            car={activeCar}
+            onHoleSpacingChange={updateActiveCarHoleSpacing}
+          />
         )}
 
         {activeTab === "dynamic" && (
           <DynamicScreen car={activeCar} />
+        )}
+
+        {activeTab === "modeling" && (
+          <ModelingScreen car={activeCar} initialTelemetry={modelTelemetry} />
         )}
 
         {activeTab === "garage" && (
@@ -825,6 +533,7 @@ function App() {
             onCreateCar={createCar}
             onSelectCar={(carId) => {
               setActiveCarId(carId);
+              setModelTelemetry(null);
               setActiveTab("calculator");
             }}
             onLoadSetup={loadSetup}
@@ -832,6 +541,7 @@ function App() {
             onAddRun={addRun}
             onUpdateRun={updateRun}
             onDeleteRun={deleteRun}
+            onModelRun={modelRun}
             onDeleteCar={deleteCar}
           />
         )}
@@ -846,6 +556,7 @@ function App() {
         <SettingsPanel
           theme={theme}
           onThemeChange={setTheme}
+          cloud={cloud}
           onClose={() => setShowSettings(false)}
         />
       )}
@@ -878,10 +589,12 @@ function SettingsButton({
 function SettingsPanel({
   theme,
   onThemeChange,
+  cloud,
   onClose,
 }: {
   theme: ThemePreference;
   onThemeChange: (theme: ThemePreference) => void;
+  cloud: ReturnType<typeof useCloudGarageSync>;
   onClose: () => void;
 }) {
   const themes: {
@@ -896,7 +609,7 @@ function SettingsPanel({
   return (
     <div
       className="settings-overlay"
-      onMouseDown={(e) => {
+      onMouseDown={(e: MouseEvent<HTMLDivElement>) => {
         if (e.target === e.currentTarget) {
           onClose();
         }
@@ -952,29 +665,12 @@ function SettingsPanel({
           <div className="settings-section-heading">
             <h3>Account</h3>
             <p>
-              Your garage is currently saved on this
-              device.
+              Local-first storage stays active. Sign in only if
+              you want automatic browser / iPhone sync.
             </p>
           </div>
 
-          <div className="account-card">
-            <div>
-              <strong>Not signed in</strong>
-              <span>
-                Optional account sync will let ChassisLab
-                keep cars and setups synchronized between
-                the website and mobile app.
-              </span>
-            </div>
-
-            <button
-              type="button"
-              className="secondary-button"
-              disabled
-            >
-              Sign in — coming later
-            </button>
-          </div>
+<CloudAccountPanel cloud={cloud} />
         </div>
       </section>
     </div>
@@ -1045,7 +741,7 @@ function AddCarForm({
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
             placeholder="Foxbody No Prep"
           />
         </div>
@@ -1202,7 +898,7 @@ function FourLinkCalculator({
         <section className="input-panel">
           <div className="section first-section">
             <div className="section-title-with-note">
-              <h2>Upper Link</h2>
+              <h2>Upper Link*</h2>
 
               <span className="tiny-section-note">
                 * Triangulated: use theoretical side-view
@@ -1220,30 +916,30 @@ function FourLinkCalculator({
             />
 
             <div className="two-column">
-  <MeasurementField
-    label="Rear height"
-    value={inputs.upperRearHeight}
-    help="ground to bolt center"
-    onChange={(value) =>
-      updateInput(
-        "upperRearHeight",
-        value
-      )
-    }
-  />
+              <MeasurementField
+                label="Rear height"
+                value={inputs.upperRearHeight}
+                help="ground to bolt center"
+                onChange={(value) =>
+                  updateInput(
+                    "upperRearHeight",
+                    value
+                  )
+                }
+              />
 
-  <MeasurementField
-    label="Front height"
-    value={inputs.upperFrontHeight}
-    help="ground to bolt center"
-    onChange={(value) =>
-      updateInput(
-        "upperFrontHeight",
-        value
-      )
-    }
-  />
-</div>
+              <MeasurementField
+                label="Front height"
+                value={inputs.upperFrontHeight}
+                help="ground to bolt center"
+                onChange={(value) =>
+                  updateInput(
+                    "upperFrontHeight",
+                    value
+                  )
+                }
+              />
+            </div>
           </div>
 
           <div className="section">
@@ -1259,30 +955,30 @@ function FourLinkCalculator({
             />
 
             <div className="two-column">
-  <MeasurementField
-    label="Rear height"
-    value={inputs.lowerRearHeight}
-    help="ground to bolt center"
-    onChange={(value) =>
-      updateInput(
-        "lowerRearHeight",
-        value
-      )
-    }
-  />
+              <MeasurementField
+                label="Rear height"
+                value={inputs.lowerRearHeight}
+                help="ground to bolt center"
+                onChange={(value) =>
+                  updateInput(
+                    "lowerRearHeight",
+                    value
+                  )
+                }
+              />
 
-  <MeasurementField
-    label="Front height"
-    value={inputs.lowerFrontHeight}
-    help="ground to bolt center"
-    onChange={(value) =>
-      updateInput(
-        "lowerFrontHeight",
-        value
-      )
-    }
-  />
-</div>
+              <MeasurementField
+                label="Front height"
+                value={inputs.lowerFrontHeight}
+                help="ground to bolt center"
+                onChange={(value) =>
+                  updateInput(
+                    "lowerFrontHeight",
+                    value
+                  )
+                }
+              />
+            </div>
           </div>
 
           <div className="section">
@@ -1314,6 +1010,38 @@ function FourLinkCalculator({
                 updateInput("tireDiameter", value)
               }
             />
+
+            <div className="optional-weight-section">
+              <div className="optional-weight-heading">
+                <div>
+                  <p className="eyebrow">OPTIONAL</p>
+                  <h3>Scale Weights</h3>
+                </div>
+                <span>Used for CG position, Dynamic and Modeling.</span>
+              </div>
+
+              <div className="two-column">
+                <MeasurementField
+                  label="Front weight"
+                  value={inputs.frontWeight}
+                  unit="lb"
+                  onChange={(value) =>
+                    updateInput("frontWeight", value)
+                  }
+                />
+
+                <MeasurementField
+                  label="Rear weight"
+                  value={inputs.rearWeight}
+                  unit="lb"
+                  onChange={(value) =>
+                    updateInput("rearWeight", value)
+                  }
+                />
+              </div>
+
+              <WeightSummary inputs={inputs} />
+            </div>
           </div>
         </section>
 
@@ -1470,6 +1198,38 @@ function LadderBarCalculator({
                 updateInput("tireDiameter", value)
               }
             />
+
+            <div className="optional-weight-section">
+              <div className="optional-weight-heading">
+                <div>
+                  <p className="eyebrow">OPTIONAL</p>
+                  <h3>Scale Weights</h3>
+                </div>
+                <span>Used for CG position, Dynamic and Modeling.</span>
+              </div>
+
+              <div className="two-column">
+                <MeasurementField
+                  label="Front weight"
+                  value={inputs.frontWeight}
+                  unit="lb"
+                  onChange={(value) =>
+                    updateInput("frontWeight", value)
+                  }
+                />
+
+                <MeasurementField
+                  label="Rear weight"
+                  value={inputs.rearWeight}
+                  unit="lb"
+                  onChange={(value) =>
+                    updateInput("rearWeight", value)
+                  }
+                />
+              </div>
+
+              <WeightSummary inputs={inputs} />
+            </div>
           </div>
         </section>
 
@@ -1512,10 +1272,12 @@ function LadderBarCalculator({
 
 function BarChangeScreen({
   car,
+  onHoleSpacingChange,
 }: {
   car: Car;
+  onHoleSpacingChange: (value: string) => void;
 }) {
-  const [spacing, setSpacing] = useState("0.625");
+  const spacing = car.holeSpacing || DEFAULT_HOLE_SPACING;
 
   const [offsets, setOffsets] =
     useState<BracketOffsets>({
@@ -1525,12 +1287,21 @@ function BarChangeScreen({
       lowerRear: 0,
     });
 
+  useEffect(() => {
+    setOffsets({
+      upperFront: 0,
+      upperRear: 0,
+      lowerFront: 0,
+      lowerRear: 0,
+    });
+  }, [car.id]);
+
   if (car.suspensionType === "ladder-bar") {
     return (
       <LadderBarChangeScreen
         car={car}
         spacing={spacing}
-        setSpacing={setSpacing}
+        setSpacing={onHoleSpacingChange}
       />
     );
   }
@@ -1551,7 +1322,7 @@ function BarChangeScreen({
         <ScreenHeading
           eyebrow="THEORETICAL GEOMETRY"
           title="Theoretical Bar Change"
-          description="Use your static setup as the baseline, then move any chassis-side or axle-side pin."
+          description="Use your static setup as the baseline, then move any chassis-side or axle-side bar mounting point."
         />
 
         <div className="coming-soon-box">
@@ -1626,12 +1397,15 @@ function BarChangeScreen({
               min="0.001"
               step="0.001"
               value={spacing}
-              onChange={(e) =>
-                setSpacing(e.target.value)
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                onHoleSpacingChange(e.target.value)
               }
             />
             <span>in</span>
           </div>
+          <small className="hole-spacing-note">
+            Saved with the car and each saved setup.
+          </small>
         </label>
       </div>
 
@@ -1794,6 +1568,10 @@ function LadderBarChangeScreen({
 }) {
   const [offset, setOffset] = useState(0);
 
+  useEffect(() => {
+    setOffset(0);
+  }, [car.id]);
+
   const baseline = toLadderInputs(
     car.calculatorInputs
   );
@@ -1863,12 +1641,15 @@ function LadderBarChangeScreen({
               min="0.001"
               step="0.001"
               value={spacing}
-              onChange={(e) =>
+              onChange={(e: ChangeEvent<HTMLInputElement>) =>
                 setSpacing(e.target.value)
               }
             />
             <span>in</span>
           </div>
+          <small className="hole-spacing-note">
+            Saved with the car and each saved setup.
+          </small>
         </label>
       </div>
 
@@ -2138,281 +1919,1171 @@ function DynamicScreen({
 }: {
   car: Car;
 }) {
-  const [travel, setTravel] = useState(0);
+  const [rearTravel, setRearTravel] = useState(0);
+  const [frontTravel, setFrontTravel] = useState(0);
 
-  const travelSteps: number[] = [];
+  useEffect(() => {
+    setRearTravel(0);
+    setFrontTravel(0);
+  }, [car.id]);
 
-  for (
-    let value = -2;
-    value <= 7.0001;
-    value += 0.5
-  ) {
-    travelSteps.push(Number(value.toFixed(1)));
-  }
+  const dynamicCg = calculateDynamicCg(
+    car.calculatorInputs,
+    rearTravel,
+    frontTravel
+  );
 
   if (car.suspensionType === "ladder-bar") {
-    const baseline = toLadderInputs(
-      car.calculatorInputs
-    );
+    const baseline = toLadderInputs(car.calculatorInputs);
+    const baselineResult = calculateLadderBar(baseline);
 
-    const baselineResult =
-      calculateLadderBar(baseline);
-
-    if (
-      baselineResult === null ||
-      "error" in baselineResult
-    ) {
-      return (
-        <section className="screen-card">
-          <ScreenHeading
-            eyebrow="SUSPENSION TRAVEL"
-            title="Dynamic Geometry"
-            description="Sweep the current ladder-bar geometry through squat and separation."
-          />
-
-          <div className="coming-soon-box">
-            Finish a valid ladder-bar setup on the IC &
-            AS screen first.
-          </div>
-        </section>
-      );
+    if (baselineResult === null || "error" in baselineResult) {
+      return <DynamicInvalidState type="ladder-bar" />;
     }
 
     const dynamicInputs: LadderInputs = {
       ...baseline,
       ladderFrontHeight:
-        baseline.ladderFrontHeight + travel,
+        baseline.ladderFrontHeight + rearTravel,
+      cgHeight:
+        dynamicCg?.dynamicCgHeight ?? baseline.cgHeight,
     };
 
-    const dynamicResult =
-      calculateLadderBar(dynamicInputs);
+    const dynamicResult = calculateLadderBar(dynamicInputs);
 
     return (
       <>
         <ScreenHeading
           eyebrow="SUSPENSION TRAVEL"
           title="Dynamic Geometry"
-          description="Move the chassis-mounted ladder-bar pivot with rear suspension travel while the rear axle center and physical bar length stay fixed."
+          description="Rear travel changes the suspension geometry. Front travel independently changes chassis pitch and the effective CG height used for down-track anti-squat."
         />
 
         <div className="dynamic-layout">
-          <TravelControls
-            travel={travel}
-            onTravelChange={setTravel}
-            travelSteps={travelSteps}
+          <DynamicControls
+            rearTravel={rearTravel}
+            frontTravel={frontTravel}
+            onRearTravelChange={setRearTravel}
+            onFrontTravelChange={setFrontTravel}
+            dynamicCg={dynamicCg}
           />
 
           <section className="results-panel dynamic-results">
-            <DynamicResultEyebrow travel={travel} />
-
+            <DynamicResultEyebrow rearTravel={rearTravel} />
             <h2>Results</h2>
 
-            {dynamicResult &&
-              "error" in dynamicResult && (
-                <div className="error-box">
-                  {dynamicResult.error}
-                </div>
-              )}
+            {dynamicResult && "error" in dynamicResult && (
+              <div className="error-box">{dynamicResult.error}</div>
+            )}
 
-            {dynamicResult &&
-              !("error" in dynamicResult) && (
-                <>
-                  <LadderBarPlot
-                    inputs={dynamicInputs}
-                    result={dynamicResult}
-                  />
-
-                  <LadderResultGrid
-                    result={dynamicResult}
-                  />
-
-                  <LadderDifference
-                    baseline={baselineResult}
-                    changed={dynamicResult}
-                  />
-                </>
-              )}
+            {dynamicResult && !("error" in dynamicResult) && (
+              <>
+                <LadderBarPlot
+                  inputs={dynamicInputs}
+                  result={dynamicResult}
+                />
+                <LadderResultGrid result={dynamicResult} />
+                <LadderDifference
+                  baseline={baselineResult}
+                  changed={dynamicResult}
+                />
+              </>
+            )}
           </section>
         </div>
       </>
     );
   }
 
-  const baseline = toNumericInputs(
-    car.calculatorInputs
-  );
+  const baseline = toNumericInputs(car.calculatorInputs);
+  const baselineResult = calculateFourLink(baseline);
 
-  const baselineResult =
-    calculateFourLink(baseline);
-
-  if (
-    baselineResult === null ||
-    "error" in baselineResult
-  ) {
-    return (
-      <section className="screen-card">
-        <ScreenHeading
-          eyebrow="SUSPENSION TRAVEL"
-          title="Dynamic Geometry"
-          description="Sweep the current 4-link through squat and separation."
-        />
-
-        <div className="coming-soon-box">
-          Finish a valid static setup on the IC & AS
-          screen first.
-        </div>
-      </section>
-    );
+  if (baselineResult === null || "error" in baselineResult) {
+    return <DynamicInvalidState type="4-link" />;
   }
 
   const dynamicInputs: NumericInputs = {
     ...baseline,
     upperFrontHeight:
-      baseline.upperFrontHeight + travel,
+      baseline.upperFrontHeight + rearTravel,
     lowerFrontHeight:
-      baseline.lowerFrontHeight + travel,
+      baseline.lowerFrontHeight + rearTravel,
+    cgHeight:
+      dynamicCg?.dynamicCgHeight ?? baseline.cgHeight,
   };
 
-  const dynamicResult =
-    calculateFourLink(dynamicInputs);
+  const dynamicResult = calculateFourLink(dynamicInputs);
 
   return (
     <>
       <ScreenHeading
         eyebrow="SUSPENSION TRAVEL"
         title="Dynamic Geometry"
-        description="Move the chassis-side pivots through squat or separation while the axle-side pivots and physical bar lengths stay fixed."
+        description="Rear travel moves the chassis-side 4-link pivots and changes IC. Front travel changes chassis pitch and CG height without moving the rear suspension IC."
       />
 
       <div className="dynamic-layout">
-        <TravelControls
-          travel={travel}
-          onTravelChange={setTravel}
-          travelSteps={travelSteps}
+        <DynamicControls
+          rearTravel={rearTravel}
+          frontTravel={frontTravel}
+          onRearTravelChange={setRearTravel}
+          onFrontTravelChange={setFrontTravel}
+          dynamicCg={dynamicCg}
         />
 
         <section className="results-panel dynamic-results">
-          <DynamicResultEyebrow travel={travel} />
-
+          <DynamicResultEyebrow rearTravel={rearTravel} />
           <h2>Results</h2>
 
-          {dynamicResult &&
-            "error" in dynamicResult && (
-              <div className="error-box">
-                {dynamicResult.error}
-              </div>
-            )}
+          {dynamicResult && "error" in dynamicResult && (
+            <div className="error-box">{dynamicResult.error}</div>
+          )}
 
-          {dynamicResult &&
-            !("error" in dynamicResult) && (
-              <>
-                <SuspensionPlot
-                  inputs={dynamicInputs}
-                  result={dynamicResult}
-                />
-
-                <ResultGrid result={dynamicResult} />
-
-                <GeometryDifference
-                  baseline={baselineResult}
-                  changed={dynamicResult}
-                />
-              </>
-            )}
+          {dynamicResult && !("error" in dynamicResult) && (
+            <>
+              <SuspensionPlot
+                inputs={dynamicInputs}
+                result={dynamicResult}
+              />
+              <ResultGrid result={dynamicResult} />
+              <GeometryDifference
+                baseline={baselineResult}
+                changed={dynamicResult}
+              />
+            </>
+          )}
         </section>
       </div>
     </>
   );
 }
 
-function TravelControls({
-  travel,
-  onTravelChange,
-  travelSteps,
+function DynamicInvalidState({
+  type,
 }: {
-  travel: number;
-  onTravelChange: (value: number) => void;
-  travelSteps: number[];
+  type: SuspensionType;
+}) {
+  return (
+    <section className="screen-card">
+      <ScreenHeading
+        eyebrow="SUSPENSION TRAVEL"
+        title="Dynamic Geometry"
+        description="Sweep the current suspension geometry through travel."
+      />
+      <div className="coming-soon-box">
+        Finish a valid {type === "4-link" ? "4-link" : "ladder-bar"} setup on the IC & AS screen first.
+      </div>
+    </section>
+  );
+}
+
+function DynamicControls({
+  rearTravel,
+  frontTravel,
+  onRearTravelChange,
+  onFrontTravelChange,
+  dynamicCg,
+}: {
+  rearTravel: number;
+  frontTravel: number;
+  onRearTravelChange: (value: number) => void;
+  onFrontTravelChange: (value: number) => void;
+  dynamicCg: ReturnType<typeof calculateDynamicCg>;
 }) {
   return (
     <section className="travel-control-panel">
-      <div className="travel-readout">
-        <span>Rear suspension movement</span>
-
-        <strong>
-          {travel > 0 ? "+" : ""}
-          {travel.toFixed(1)}"
-        </strong>
-
-        <small>
-          {travel > 0
-            ? "Separation"
-            : travel < 0
-              ? "Squat"
-              : "Static"}
-        </small>
-      </div>
-
-      <input
-        className="travel-slider"
-        type="range"
-        min="-2"
-        max="7"
-        step="0.5"
-        value={travel}
-        onChange={(e) =>
-          onTravelChange(Number(e.target.value))
-        }
+      <TravelSlider
+        label="Rear suspension movement"
+        value={rearTravel}
+        min={-5}
+        max={5}
+        step={0.5}
+        leftLabel={'-5" squat'}
+        rightLabel={'+5" separation'}
+        onChange={onRearTravelChange}
       />
 
-      <div className="travel-scale">
-        <span>-2" squat</span>
-        <span>0"</span>
-        <span>+7" separation</span>
-      </div>
+      <div className="dynamic-divider" />
 
-      <div className="travel-step-grid">
-        {travelSteps.map((step) => (
-          <button
-            type="button"
-            key={step}
-            className={
-              travel === step ? "selected" : ""
-            }
-            onClick={() => onTravelChange(step)}
-          >
-            {step > 0 ? "+" : ""}
-            {step.toFixed(1)}
-          </button>
-        ))}
-      </div>
+      <TravelSlider
+        label="Front suspension extension"
+        value={frontTravel}
+        min={0}
+        max={9}
+        step={0.5}
+        leftLabel={'0" static'}
+        rightLabel={'+9" extension'}
+        onChange={onFrontTravelChange}
+        showSteps={false}
+      />
+
+      {dynamicCg && (
+        <div className="dynamic-cg-card">
+          <div>
+            <span>Dynamic CG height</span>
+            <strong>{dynamicCg.dynamicCgHeight.toFixed(2)}"</strong>
+          </div>
+          <div>
+            <span>Chassis pitch</span>
+            <strong>{dynamicCg.pitchDegrees.toFixed(2)}°</strong>
+          </div>
+          <small>
+            {dynamicCg.usedWeightBias
+              ? "CG fore/aft position is calculated from the entered front and rear scale weights."
+              : "No scale weights entered — CG fore/aft position is estimated at 50% of wheelbase."}
+          </small>
+        </div>
+      )}
 
       <p className="dynamic-note">
-        IC location and bar angle are calculated directly
-        from the changed geometry. Dynamic anti-squat
-        currently keeps the entered cam/CG height fixed,
-        so treat AS as an estimate until chassis pitch /
-        CG movement is added.
+        The chassis is modeled as a rigid body. Rear movement translates the chassis at the rear axle station; front-minus-rear movement sets pitch. The CG vector rotates with the chassis, so front extension changes the anti-squat reference without falsely moving the rear suspension instant center.
       </p>
     </section>
   );
 }
 
-function DynamicResultEyebrow({
-  travel,
+function TravelSlider({
+  label,
+  value,
+  min,
+  max,
+  step,
+  leftLabel,
+  rightLabel,
+  onChange,
+  showSteps = true,
 }: {
-  travel: number;
+  label: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  leftLabel: string;
+  rightLabel: string;
+  onChange: (value: number) => void;
+  showSteps?: boolean;
+}) {
+  const steps: number[] = [];
+  for (let current = min; current <= max + 0.0001; current += step) {
+    steps.push(Number(current.toFixed(2)));
+  }
+
+  return (
+    <div className="travel-block">
+      <div className="travel-readout">
+        <span>{label}</span>
+        <strong>
+          {value > 0 ? "+" : ""}
+          {value.toFixed(1)}"
+        </strong>
+      </div>
+
+      <input
+        className="travel-slider"
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(e: ChangeEvent<HTMLInputElement>) => onChange(Number(e.target.value))}
+      />
+
+      <div className="travel-scale">
+        <span>{leftLabel}</span>
+        <span>{rightLabel}</span>
+      </div>
+
+      {showSteps && (
+        <div className="travel-step-grid">
+          {steps.map((item) => (
+            <button
+              type="button"
+              key={item}
+              className={value === item ? "selected" : ""}
+              onClick={() => onChange(item)}
+            >
+              {item > 0 ? "+" : ""}
+              {item.toFixed(1)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DynamicResultEyebrow({
+  rearTravel,
+}: {
+  rearTravel: number;
 }) {
   return (
     <p className="eyebrow">
-      {travel > 0
+      {rearTravel > 0
         ? "SEPARATED GEOMETRY"
-        : travel < 0
+        : rearTravel < 0
           ? "SQUATTED GEOMETRY"
-          : "STATIC GEOMETRY"}
+          : "STATIC REAR GEOMETRY"}
     </p>
   );
 }
+
+/* =========================================================
+   MODELING BETA
+========================================================= */
+
+function formatLinkLoad(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return "—";
+  return `${Math.round(Math.abs(value))} lb ${
+    value >= 0 ? "compression" : "tension"
+  }`;
+}
+
+function getModelCharacter(snapshot: ModelSnapshot) {
+  const speed = snapshot.velocity;
+  const verticalAccel = snapshot.acceleration;
+
+  const tendency =
+    Math.abs(speed) < 0.12 && Math.abs(verticalAccel) < 2
+      ? "Near equilibrium"
+      : speed > 0.12
+        ? "Separating"
+        : speed < -0.12
+          ? "Returning / squatting"
+          : verticalAccel > 0
+            ? "Building separation"
+            : "Settling";
+
+  const direction = snapshot.travel >= 0 ? 1 : -1;
+  const asChangeInTravelDirection = snapshot.asSensitivity * direction;
+
+  const migration =
+    Math.abs(snapshot.asSensitivity) < 3
+      ? "AS stays relatively stable with travel"
+      : asChangeInTravelDirection < -3
+        ? "AS falls with movement — the geometric hit decays"
+        : "AS builds with movement — the geometry reinforces separation";
+
+  return { tendency, migration };
+}
+
+function ModelingScreen({
+  car,
+  initialTelemetry,
+}: {
+  car: Car;
+  initialTelemetry?: RunTelemetry | null;
+}) {
+  const [time, setTime] = useState(0);
+  const [peakG, setPeakG] = useState(1.6);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [dragyPoints, setDragyPoints] = useState<DragyPoint[]>([]);
+  const [importName, setImportName] = useState("");
+  const [importMessage, setImportMessage] = useState("");
+  const [needsDragyConversion, setNeedsDragyConversion] = useState(false);
+  const [selectedPoint, setSelectedPoint] = useState<
+    "contact" | "ic" | "cg" | "upper" | "lower" | null
+  >(null);
+
+  const animationRef = useRef<number | null>(null);
+  const lastFrameRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    setTime(0);
+    setIsPlaying(false);
+    setSelectedPoint(null);
+
+    if (initialTelemetry?.points?.length) {
+      setDragyPoints(initialTelemetry.points);
+      setImportName(initialTelemetry.fileName);
+      setImportMessage(
+        `Garage run: loaded ${initialTelemetry.points.length} saved telemetry samples.`
+      );
+      setNeedsDragyConversion(false);
+    } else {
+      setDragyPoints([]);
+      setImportName("");
+      setImportMessage("");
+      setNeedsDragyConversion(false);
+    }
+  }, [car.id, initialTelemetry]);
+
+  const weights = getWeightData(car.calculatorInputs);
+  const baseCgHeight = parseNumber(car.calculatorInputs.cgHeight);
+  const baseGeometry = getModelGeometryAtTravel(
+    car,
+    0,
+    Number.isFinite(baseCgHeight) && baseCgHeight > 0 ? baseCgHeight : 1
+  );
+  const validGeometry = baseGeometry !== null;
+
+  const maxTime =
+    dragyPoints.length > 0
+      ? Math.max(
+          0.1,
+          Math.min(1.5, dragyPoints[dragyPoints.length - 1].time)
+        )
+      : 1.5;
+
+  useEffect(() => {
+    if (!isPlaying) {
+      if (animationRef.current !== null) {
+        cancelAnimationFrame(animationRef.current);
+      }
+      animationRef.current = null;
+      lastFrameRef.current = null;
+      return;
+    }
+
+    function frame(timestamp: number) {
+      if (lastFrameRef.current === null) {
+        lastFrameRef.current = timestamp;
+      }
+
+      const elapsed = (timestamp - lastFrameRef.current) / 1000;
+      lastFrameRef.current = timestamp;
+
+      setTime((current) => {
+        const next = current + elapsed;
+        if (next >= maxTime) {
+          setIsPlaying(false);
+          return maxTime;
+        }
+        return next;
+      });
+
+      animationRef.current = requestAnimationFrame(frame);
+    }
+
+    animationRef.current = requestAnimationFrame(frame);
+
+    return () => {
+      if (animationRef.current !== null) {
+        cancelAnimationFrame(animationRef.current);
+      }
+    };
+  }, [isPlaying, maxTime]);
+
+  async function handleImport(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const parsed = await parseTelemetryFile(file);
+    const points = parsed.telemetry?.points ?? parsed.points;
+
+    setImportName(file.name);
+    setNeedsDragyConversion(Boolean(parsed.needsConversion));
+
+    if (points.length < 2) {
+      setDragyPoints([]);
+      setImportMessage(parsed.message);
+      e.target.value = "";
+      return;
+    }
+
+    setNeedsDragyConversion(false);
+    setDragyPoints(points);
+    setImportMessage(
+      `${parsed.message}: loaded ${points.length} samples${
+        points.some((point) => point.g !== null) ? " with longitudinal G." : ". G is being derived from speed."
+      }`
+    );
+    setTime(0);
+    setIsPlaying(false);
+    e.target.value = "";
+  }
+
+  if (!validGeometry) {
+    return (
+      <section className="screen-card">
+        <ScreenHeading
+          eyebrow="MODELING BETA"
+          title="Chassis Response Model"
+          description="Animate how the current suspension geometry tends to move the chassis during the hit."
+        />
+        <div className="coming-soon-box">
+          Finish a valid static setup first.
+        </div>
+      </section>
+    );
+  }
+
+  if (!weights) {
+    return (
+      <section className="screen-card">
+        <ScreenHeading
+          eyebrow="MODELING BETA"
+          title="Chassis Response Model"
+          description="Animate how the current suspension geometry tends to move the chassis during the hit."
+        />
+        <div className="coming-soon-box">
+          Enter optional front and rear scale weights on the IC & AS page to enable the model.
+        </div>
+      </section>
+    );
+  }
+
+  const snapshot = simulateModelState(
+    car,
+    weights,
+    dragyPoints,
+    peakG,
+    time
+  );
+
+  if (!snapshot) {
+    return (
+      <section className="screen-card">
+        <div className="error-box">
+          The current geometry could not be swept through this modeled travel position.
+        </div>
+      </section>
+    );
+  }
+
+  const character = getModelCharacter(snapshot);
+
+  return (
+    <>
+      <div className="screen-heading-row">
+        <ScreenHeading
+          eyebrow="MODELING BETA V2.5.1"
+          title="Chassis Response Model"
+          description="Watch the chassis squat or separate while ChassisLab recalculates the actual bars, IC and anti-squat throughout the hit."
+        />
+
+        <label className="import-log-button">
+          <span>Import Dragy / CSV</span>
+          <input
+            type="file"
+            accept=".csv,.txt,.json,.vbo,.dragy,.zip,text/csv,text/plain,application/json,application/zip"
+            onChange={handleImport}
+          />
+        </label>
+      </div>
+
+      <div className="model-layout">
+        <section className="model-main-panel">
+          <ForceModelDiagram
+            car={car}
+            snapshot={snapshot}
+            weights={weights}
+            selectedPoint={selectedPoint}
+            onSelectPoint={setSelectedPoint}
+          />
+
+          <div className="model-timeline-panel">
+            <div className="model-timeline-top">
+              <button
+                type="button"
+                className="primary-button model-play-button"
+                onClick={() => {
+                  if (time >= maxTime) setTime(0);
+                  setIsPlaying((current) => !current);
+                }}
+              >
+                {isPlaying ? "Pause" : "Play"}
+              </button>
+
+              <div>
+                <span>Hit timeline</span>
+                <strong>{time.toFixed(2)} s</strong>
+              </div>
+            </div>
+
+            <input
+              className="model-timeline-slider"
+              type="range"
+              min="0"
+              max={maxTime}
+              step="0.01"
+              value={time}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                setIsPlaying(false);
+                setTime(Number(e.target.value));
+              }}
+            />
+
+            <div className="travel-scale">
+              <span>0.00 s</span>
+              <span>{maxTime.toFixed(2)} s</span>
+            </div>
+          </div>
+        </section>
+
+        <aside className="model-side-panel">
+          <div className="model-state-card">
+            <div>
+              <span>Estimated rear motion</span>
+              <strong className={snapshot.travel >= 0 ? "separation-value" : "squat-value"}>
+                {snapshot.travel > 0 ? "+" : ""}
+                {snapshot.travel.toFixed(2)}"
+              </strong>
+              <small>{snapshot.wheelie ? "Front axle unloaded / wheelie threshold" : character.tendency}</small>
+            </div>
+            <div>
+              <span>Current anti-squat</span>
+              <strong>{snapshot.geometry.result.antiSquat.toFixed(1)}%</strong>
+              <small>
+                IC {snapshot.geometry.result.icLength.toFixed(1)}" × {snapshot.geometry.result.icHeight.toFixed(1)}"
+              </small>
+            </div>
+          </div>
+
+          {snapshot.travelLimited && (
+            <div className="model-limit-warning">
+              Model travel envelope reached. ChassisLab freezes the transient jacking load here instead of inventing additional tire force outside the ±5" model envelope.
+            </div>
+          )}
+
+          <div className="model-character-card">
+            <p className="eyebrow">GEOMETRY CHARACTER</p>
+            <strong>{character.migration}</strong>
+            <div className="model-character-row">
+              <span>AS change / 1" travel</span>
+              <b>
+                {snapshot.asSensitivity > 0 ? "+" : ""}
+                {snapshot.asSensitivity.toFixed(1)}%
+              </b>
+            </div>
+            <div className="model-character-row">
+              <span>IC length change / 1"</span>
+              <b>
+                {snapshot.icSensitivity > 0 ? "+" : ""}
+                {snapshot.icSensitivity.toFixed(1)}"
+              </b>
+            </div>
+            {snapshot.rearSpread !== null && (
+              <div className="model-character-row">
+                <span>Rear bar spread</span>
+                <b>{snapshot.rearSpread.toFixed(2)}"</b>
+              </div>
+            )}
+            {"upperAngle" in snapshot.geometry.result && (
+              <>
+                <div className="model-character-row">
+                  <span>Upper bar angle</span>
+                  <b>{snapshot.geometry.result.upperAngle.toFixed(2)}°</b>
+                </div>
+                <div className="model-character-row">
+                  <span>Lower bar angle</span>
+                  <b>{snapshot.geometry.result.lowerAngle.toFixed(2)}°</b>
+                </div>
+              </>
+            )}
+          </div>
+
+          <div className="model-source-card">
+            <p className="eyebrow">DATA SOURCE</p>
+            <strong>
+              {dragyPoints.length > 0
+                ? importName || "Imported CSV"
+                : "Manual beta curve"}
+            </strong>
+            <span>
+              {dragyPoints.length > 0
+                ? importMessage
+                : "Use peak G for testing, or import CSV, JSON, VBO, or a readable Dragy trace for measured speed/G."}
+            </span>
+            {dragyPoints.length === 0 && importMessage && (
+              <div className={needsDragyConversion ? "model-import-error" : "model-import-warning"}>
+                <strong>{needsDragyConversion ? "Telemetry not loaded" : "Import note"}</strong>
+                <span>{importMessage}</span>
+                {needsDragyConversion && (
+                  <a
+                    href="https://dragy-decryptor.d3vl.com/"
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Convert Dragy file to CSV / JSON
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+
+          {dragyPoints.length === 0 && (
+            <label className="model-g-control">
+              <span>Peak longitudinal G</span>
+              <strong>{peakG.toFixed(2)} g</strong>
+              <input
+                type="range"
+                min="0.2"
+                max="2.5"
+                step="0.05"
+                value={peakG}
+                onChange={(e: ChangeEvent<HTMLInputElement>) =>
+                  setPeakG(Number(e.target.value))
+                }
+              />
+            </label>
+          )}
+
+
+          <div className="model-assumption-card">
+            <p className="eyebrow">BASELINE RESPONSE</p>
+            <div>
+              <span>Estimated total rear wheel rate</span>
+              <strong>{Math.round(snapshot.estimatedWheelRate)} lb/in</strong>
+            </div>
+            <small>
+              Fixed 1.40 Hz rear ride-frequency / 0.55 damping baseline when actual spring and shock data are unavailable. Rear motion is solved from the live four-bar geometry, moving CG and measured/assumed G; there is no arbitrary travel-response control.
+            </small>
+          </div>
+
+          <div className="model-metric-grid">
+            <ModelMetric label="Longitudinal G" value={`${snapshot.currentG.toFixed(2)} g`} />
+            <ModelMetric label="Dynamic CG height" value={`${snapshot.dynamicCgHeight.toFixed(2)}"`} />
+            <ModelMetric label="Front travel est." value={`${snapshot.frontVisualLift.toFixed(2)}"`} />
+            {snapshot.speed !== null && (
+              <ModelMetric label="Speed" value={`${snapshot.speed.toFixed(1)} mph`} />
+            )}
+            <ModelMetric label="Drive force" value={`${Math.round(snapshot.driveForce)} lb`} />
+            <ModelMetric
+              label="Rear tire normal load"
+              value={`${Math.round(snapshot.rearTireLoadEstimate)} lb`}
+              emphasis
+            />
+            <ModelMetric
+              label="Base rear load"
+              value={`${Math.round(snapshot.baseRearTireLoad)} lb`}
+            />
+            <ModelMetric
+              label="Jacking transient"
+              value={`${snapshot.jackingTireLoad >= 0 ? "+" : ""}${Math.round(
+                snapshot.jackingTireLoad
+              )} lb`}
+            />
+            <ModelMetric
+              label="AS excess / deficit"
+              value={`${snapshot.excessAntiSquatReaction >= 0 ? "+" : ""}${Math.round(
+                snapshot.excessAntiSquatReaction
+              )} lb`}
+            />
+          </div>
+
+          {car.suspensionType === "4-link" && (
+            <div className="model-link-loads">
+              <p className="eyebrow">LINK FORCE ESTIMATE</p>
+              <div>
+                <span>Upper bar</span>
+                <strong>{formatLinkLoad(snapshot.upperLinkForce)}</strong>
+              </div>
+              <div>
+                <span>Lower bar</span>
+                <strong>{formatLinkLoad(snapshot.lowerLinkForce)}</strong>
+              </div>
+              <div>
+                <span>Axle torque couple</span>
+                <strong>
+                  {snapshot.axleTorqueCouple === null
+                    ? "—"
+                    : `${Math.round(snapshot.axleTorqueCouple / 12)} lb-ft`}
+                </strong>
+              </div>
+            </div>
+          )}
+
+          <div className="model-beta-note">
+            <strong>Beta model</strong>
+            <p>
+              The four-link is solved as a rigid mechanism with both bar lengths fixed and axle-housing rotation / fore-aft migration solved together. Rear motion changes the live IC and anti-squat. Front rise is visual only and no longer feeds a guessed front spring rate back into the rear force solution. Longitudinal transfer sets the base axle loads; vertical chassis acceleration adds a temporary rear-tire hit that can raise total normal force above static vehicle weight and naturally decays when vertical acceleration stops. Exact inches still require actual spring and shock data, so travel remains a physics-based estimate rather than a shock-travel guarantee.
+            </p>
+          </div>
+        </aside>
+      </div>
+    </>
+  );
+}
+
+function ModelMetric({
+  label,
+  value,
+  emphasis = false,
+}: {
+  label: string;
+  value: string;
+  emphasis?: boolean;
+}) {
+  return (
+    <div className={`model-metric ${emphasis ? "emphasis" : ""}`}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function ForceModelDiagram({
+  car,
+  snapshot,
+  weights,
+  selectedPoint,
+  onSelectPoint,
+}: {
+  car: Car;
+  snapshot: ModelSnapshot;
+  weights: WeightData;
+  selectedPoint: "contact" | "ic" | "cg" | "upper" | "lower" | null;
+  onSelectPoint: (
+    point: "contact" | "ic" | "cg" | "upper" | "lower" | null
+  ) => void;
+}) {
+  const inputs = car.calculatorInputs;
+  const wheelbase = parseNumber(inputs.wheelbase);
+  const cgHeight = parseNumber(inputs.cgHeight);
+
+  // The model drawing uses slightly undersized visual tires so they sit cleanly inside the supplied silhouette wheel openings. Tire
+  // diameter here is visual only; the suspension calculations still use the
+  // vehicle measurements entered elsewhere in ChassisLab.
+  const modelTireRadius = 13;
+
+  const width = 820;
+  const height = 390;
+  const groundY = 315;
+  const rearX = 175;
+  const chassisScale = 650 / Math.max(wheelbase + 70, 1);
+  const frontX = rearX + wheelbase * chassisScale;
+  const wheelRadiusPx = Math.min(
+    54,
+    Math.max(30, modelTireRadius * chassisScale)
+  );
+  const rearWheelRadiusPx = wheelRadiusPx;
+  const frontWheelRadiusPx = wheelRadiusPx;
+  const rearAxleY = groundY - rearWheelRadiusPx;
+  const frontAxleY = groundY - frontWheelRadiusPx;
+
+  const result = snapshot.geometry.result;
+  const rearTravel = snapshot.travel;
+  const bodyRearRise = rearTravel;
+  const bodyFrontRise = snapshot.frontVisualLift;
+  const bodyPitchRadians = Math.asin(
+    Math.max(
+      -1,
+      Math.min(
+        1,
+        (bodyFrontRise - bodyRearRise) /
+          Math.max(wheelbase, 1)
+      )
+    )
+  );
+  const bodyPitchDegrees = bodyPitchRadians * (180 / Math.PI);
+
+  // The supplied notchback trace has wheel-center references at roughly
+  // (165,160) and (625,160), a 460 px wheelbase. Scale it from the vehicle's
+  // entered wheelbase, then move/rotate the body while both 28-inch tires stay
+  // planted on the road.
+  const silhouetteRearAxleX = 165;
+  const silhouetteRearAxleY = 160;
+  const silhouetteWheelbase = 460;
+  const silhouetteScale =
+    (frontX - rearX) / silhouetteWheelbase;
+
+  function bodyPoint(
+    xFromRear: number,
+    heightFromGround: number
+  ) {
+    const x = xFromRear * chassisScale;
+    const y =
+      (heightFromGround - modelTireRadius) *
+      chassisScale;
+    const cosine = Math.cos(bodyPitchRadians);
+    const sine = Math.sin(bodyPitchRadians);
+
+    return {
+      x:
+        rearX +
+        x * cosine -
+        y * sine,
+      y:
+        rearAxleY -
+        bodyRearRise * chassisScale -
+        (x * sine + y * cosine),
+    };
+  }
+
+  const cgBody = bodyPoint(
+    weights.cgXFromRear,
+    cgHeight
+  );
+  const rawIcX = rearX + result.icLength * chassisScale;
+  const rawIcY = groundY - result.icHeight * chassisScale;
+  const icX = Math.max(45, Math.min(width - 45, rawIcX));
+  const icY = Math.max(35, Math.min(groundY - 18, rawIcY));
+
+  let upperRear: { x: number; y: number } | null = null;
+  let upperFront: { x: number; y: number } | null = null;
+  let lowerRear: { x: number; y: number } | null = null;
+  let lowerFront: { x: number; y: number } | null = null;
+  let ladderFront: { x: number; y: number } | null = null;
+
+  if (snapshot.geometry.kinematics) {
+    const k = snapshot.geometry.kinematics;
+    upperRear = {
+      x: rearX + k.rearUpper.x * chassisScale,
+      y: groundY - k.rearUpper.y * chassisScale,
+    };
+    upperFront = {
+      x: rearX + k.frontUpper.x * chassisScale,
+      y: groundY - k.frontUpper.y * chassisScale,
+    };
+    lowerRear = {
+      x: rearX + k.rearLower.x * chassisScale,
+      y: groundY - k.rearLower.y * chassisScale,
+    };
+    lowerFront = {
+      x: rearX + k.frontLower.x * chassisScale,
+      y: groundY - k.frontLower.y * chassisScale,
+    };
+  } else if (snapshot.geometry.ladderInputs) {
+    const n = snapshot.geometry.ladderInputs;
+    ladderFront = {
+      x: rearX + result.icLength * chassisScale,
+      y: groundY - n.ladderFrontHeight * chassisScale,
+    };
+  }
+
+  const driveArrow = Math.min(
+    72,
+    Math.max(18, Math.abs(snapshot.driveForce) / 45)
+  );
+  const verticalArrow = Math.min(
+    58,
+    Math.max(15, Math.abs(snapshot.excessAntiSquatReaction) / 18)
+  );
+  const verticalDirection = snapshot.excessAntiSquatReaction >= 0 ? -1 : 1;
+
+  const details =
+    selectedPoint === "contact"
+      ? {
+          title: "Rear tire / contact patch",
+          values: [
+            `Drive force ${Math.round(snapshot.driveForce)} lb`,
+            `Rear normal load ${Math.round(snapshot.rearTireLoadEstimate)} lb`,
+            `Base rear load ${Math.round(snapshot.baseRearTireLoad)} lb`,
+            `Jacking transient ${snapshot.jackingTireLoad >= 0 ? "+" : ""}${Math.round(snapshot.jackingTireLoad)} lb`,
+          ],
+        }
+      : selectedPoint === "ic"
+        ? {
+            title: "Instant center",
+            values: [
+              `IC ${result.icLength.toFixed(1)}\" × ${result.icHeight.toFixed(1)}\"`,
+              `Anti-squat ${result.antiSquat.toFixed(1)}%`,
+              `AS change ${snapshot.asSensitivity > 0 ? "+" : ""}${snapshot.asSensitivity.toFixed(1)}% / in`,
+            ],
+          }
+        : selectedPoint === "cg"
+          ? {
+              title: "Vehicle CG",
+              values: [
+                `CG ${weights.cgXFromRear.toFixed(1)}\" forward of rear axle`,
+                `CG height ${cgHeight.toFixed(1)}\"`,
+                `Front visual lift ${snapshot.frontVisualLift.toFixed(1)}\"`,
+              ],
+            }
+          : selectedPoint === "upper"
+            ? {
+                title: "Upper link",
+                values: [
+                  `Load ${formatLinkLoad(snapshot.upperLinkForce)}`,
+                  snapshot.rearSpread !== null
+                    ? `Rear spread ${snapshot.rearSpread.toFixed(2)}\"`
+                    : "Rear spread —",
+                ],
+              }
+            : selectedPoint === "lower"
+              ? {
+                  title: "Lower link",
+                  values: [
+                    `Load ${formatLinkLoad(snapshot.lowerLinkForce)}`,
+                    `Rear travel ${snapshot.travel > 0 ? "+" : ""}${snapshot.travel.toFixed(2)}\"`,
+                  ],
+                }
+              : null;
+
+  return (
+    <div className="model-diagram-card model-car-diagram-card">
+      <div className="geometry-title-row">
+        <div>
+          <p className="eyebrow">LIVE CHASSIS VIEW</p>
+          <h3>
+            {snapshot.currentG.toFixed(2)} g · {snapshot.travel >= 0 ? "separating" : "squatting"} {Math.abs(snapshot.travel).toFixed(2)}"
+          </h3>
+        </div>
+        <span className="model-tap-note">Tap IC, CG, tire or a bar</span>
+      </div>
+
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        className="model-force-svg model-car-svg"
+        role="img"
+        aria-label="Animated side-view chassis and suspension response model"
+      >
+        <defs>
+          <marker
+            id="model-drive-arrow"
+            markerWidth="5"
+            markerHeight="5"
+            refX="4.4"
+            refY="2.5"
+            orient="auto"
+          >
+            <path d="M0,0 L5,2.5 L0,5 z" className="model-drive-arrow-head" />
+          </marker>
+          <marker
+            id="model-vertical-arrow"
+            markerWidth="5"
+            markerHeight="5"
+            refX="4.4"
+            refY="2.5"
+            orient="auto"
+          >
+            <path d="M0,0 L5,2.5 L0,5 z" className="model-vertical-arrow-head" />
+          </marker>
+        </defs>
+
+        <line x1="35" y1={groundY} x2={width - 35} y2={groundY} className="geometry-ground" />
+
+        <circle cx={rearX} cy={rearAxleY} r={rearWheelRadiusPx} className="geometry-tire model-rear-tire" />
+        <circle cx={frontX} cy={frontAxleY} r={frontWheelRadiusPx} className="geometry-tire front-tire" />
+        <circle cx={rearX} cy={rearAxleY} r="5" className="geometry-axle" />
+        <circle cx={frontX} cy={frontAxleY} r="4" className="geometry-axle front-axle" />
+
+        <g
+          transform={`translate(${rearX} ${(
+            rearAxleY - bodyRearRise * chassisScale
+          ).toFixed(2)}) rotate(${-bodyPitchDegrees})`}
+          className="model-car-image-group"
+        >
+          <g transform={`scale(${silhouetteScale})`}>
+            <image
+              href="/model-car-outline.png"
+              x={-silhouetteRearAxleX}
+              y={-silhouetteRearAxleY}
+              width="796"
+              height="223"
+              preserveAspectRatio="xMidYMid meet"
+              className="model-car-image"
+            />
+          </g>
+        </g>
+
+        <line x1={rearX} y1={groundY} x2={icX} y2={icY} className="model-ic-force-line" />
+
+        {upperRear && upperFront && lowerRear && lowerFront && (
+          <>
+            <line
+              x1={upperRear.x}
+              y1={upperRear.y}
+              x2={upperFront.x}
+              y2={upperFront.y}
+              className={`model-live-link model-live-upper ${selectedPoint === "upper" ? "selected" : ""}`}
+              onClick={() => onSelectPoint(selectedPoint === "upper" ? null : "upper")}
+            />
+            <line
+              x1={lowerRear.x}
+              y1={lowerRear.y}
+              x2={lowerFront.x}
+              y2={lowerFront.y}
+              className={`model-live-link model-live-lower ${selectedPoint === "lower" ? "selected" : ""}`}
+              onClick={() => onSelectPoint(selectedPoint === "lower" ? null : "lower")}
+            />
+            {[upperRear, upperFront, lowerRear, lowerFront].map((point, index) => (
+              <circle
+                key={index}
+                cx={point.x}
+                cy={point.y}
+                r="4"
+                className="geometry-pivot model-live-pivot"
+              />
+            ))}
+          </>
+        )}
+
+        {ladderFront && (
+          <line
+            x1={rearX}
+            y1={rearAxleY}
+            x2={ladderFront.x}
+            y2={ladderFront.y}
+            className="model-live-link model-live-lower"
+          />
+        )}
+
+        <line
+          x1={rearX + 8}
+          y1={groundY - 8}
+          x2={rearX + 8 + driveArrow}
+          y2={groundY - 8}
+          className="model-drive-force"
+          markerEnd="url(#model-drive-arrow)"
+        />
+
+        <line
+          x1={rearX + 18}
+          y1={rearAxleY}
+          x2={rearX + 18}
+          y2={rearAxleY + verticalDirection * verticalArrow}
+          className="model-vertical-force"
+          markerEnd="url(#model-vertical-arrow)"
+        />
+
+        <circle
+          cx={rearX}
+          cy={groundY}
+          r="7"
+          className={`model-node ${selectedPoint === "contact" ? "selected" : ""}`}
+          onClick={() => onSelectPoint(selectedPoint === "contact" ? null : "contact")}
+        />
+        <circle
+          cx={icX}
+          cy={icY}
+          r="7"
+          className={`model-node model-ic-node ${selectedPoint === "ic" ? "selected" : ""}`}
+          onClick={() => onSelectPoint(selectedPoint === "ic" ? null : "ic")}
+        />
+        <circle
+          cx={cgBody.x}
+          cy={cgBody.y}
+          r="7"
+          className={`model-node model-cg-node ${selectedPoint === "cg" ? "selected" : ""}`}
+          onClick={() => onSelectPoint(selectedPoint === "cg" ? null : "cg")}
+        />
+
+        <text x={icX + 10} y={icY - 9} className="model-svg-label">IC</text>
+        <text x={cgBody.x + 10} y={cgBody.y - 9} className="model-svg-label">CG</text>
+        <text x={rearX + 28} y={rearAxleY - 12} className="model-motion-label">
+          {snapshot.excessAntiSquatReaction >= 0 ? "separation force" : "squat force"}
+        </text>
+      </svg>
+
+      <div className="model-live-readout">
+        <span>
+          Rear chassis <strong>{snapshot.travel > 0 ? "+" : ""}{snapshot.travel.toFixed(2)}"</strong>
+        </span>
+        <span>
+          AS <strong>{result.antiSquat.toFixed(1)}%</strong>
+        </span>
+        <span>
+          Rear normal load <strong>{Math.round(snapshot.rearTireLoadEstimate)} lb</strong>
+        </span>
+      </div>
+
+      {details && (
+        <div className="model-point-detail">
+          <strong>{details.title}</strong>
+          <div>
+            {details.values.map((value) => (
+              <span key={value}>{value}</span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
 
 /* =========================================================
    GARAGE
@@ -2431,6 +3102,7 @@ function GarageScreen({
   onAddRun,
   onUpdateRun,
   onDeleteRun,
+  onModelRun,
   onDeleteCar,
 }: {
   cars: Car[];
@@ -2467,6 +3139,7 @@ function GarageScreen({
     setupId: string,
     runId: string
   ) => void;
+  onModelRun: (carId: string, setup: SavedSetup, run: RunLog) => void;
   onDeleteCar: (carId: string) => void;
 }) {
   return (
@@ -2558,6 +3231,7 @@ function GarageScreen({
                     onAddRun={onAddRun}
                     onUpdateRun={onUpdateRun}
                     onDeleteRun={onDeleteRun}
+                    onModelRun={onModelRun}
                   />
                 ))}
               </div>
@@ -2578,6 +3252,7 @@ function SavedSetupRunLog({
   onAddRun,
   onUpdateRun,
   onDeleteRun,
+  onModelRun,
 }: {
   carId: string;
   setup: SavedSetup;
@@ -2606,6 +3281,7 @@ function SavedSetupRunLog({
     setupId: string,
     runId: string
   ) => void;
+  onModelRun: (carId: string, setup: SavedSetup, run: RunLog) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [addingRun, setAddingRun] = useState(false);
@@ -2613,6 +3289,7 @@ function SavedSetupRunLog({
     useState<string | null>(null);
 
   const runs = setup.runs ?? [];
+  const setupRearBias = getRearBiasString(setup.inputs);
 
   const fourLinkResult =
     suspensionType === "4-link"
@@ -2642,6 +3319,7 @@ function SavedSetupRunLog({
             {new Date(
               setup.createdAt
             ).toLocaleDateString()}
+            {` · ${setup.holeSpacing || DEFAULT_HOLE_SPACING}" holes`}
           </span>
         </button>
 
@@ -2667,6 +3345,9 @@ function SavedSetupRunLog({
             <span>
               AS {fourLinkResult.antiSquat.toFixed(0)}%
             </span>
+            {setupRearBias && (
+              <span>Rear {setupRearBias}%</span>
+            )}
           </div>
         )}
 
@@ -2680,6 +3361,9 @@ function SavedSetupRunLog({
             <span>
               AS {ladderResult.antiSquat.toFixed(0)}%
             </span>
+            {setupRearBias && (
+              <span>Rear {setupRearBias}%</span>
+            )}
           </div>
         )}
 
@@ -2738,6 +3422,11 @@ function SavedSetupRunLog({
                       run.id
                     );
                   }}
+                  onModel={
+                    run.telemetry
+                      ? () => onModelRun(carId, setup, run)
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -2745,6 +3434,7 @@ function SavedSetupRunLog({
 
           {addingRun ? (
             <RunLogForm
+              initialRearWeightBias={setupRearBias}
               onCancel={() => setAddingRun(false)}
               onSave={(run) => {
                 onAddRun(carId, setup.id, run);
@@ -2777,6 +3467,7 @@ function RunLogCard({
   onCancelEdit,
   onSaveEdit,
   onDelete,
+  onModel,
 }: {
   run: RunLog;
   runNumber: number;
@@ -2787,6 +3478,7 @@ function RunLogCard({
     run: Omit<RunLog, "id" | "createdAt">
   ) => void;
   onDelete: () => void;
+  onModel?: () => void;
 }) {
   const performance = [
     run.sixtyFoot && `60' ${run.sixtyFoot}`,
@@ -2837,6 +3529,16 @@ function RunLogCard({
         </div>
 
         <div className="run-card-actions">
+          {onModel && (
+            <button
+              type="button"
+              className="run-edit"
+              onClick={onModel}
+            >
+              Model
+            </button>
+          )}
+
           <button
             type="button"
             className="run-edit"
@@ -2872,6 +3574,12 @@ function RunLogCard({
         </div>
       )}
 
+      {run.telemetry && (
+        <div className="run-telemetry-summary">
+          Dragy · {run.telemetry.points.length} samples
+        </div>
+      )}
+
       {run.notes && (
         <p className="run-notes">{run.notes}</p>
       )}
@@ -2883,6 +3591,7 @@ function RunLogForm({
   onSave,
   onCancel,
   initialRun,
+  initialRearWeightBias = "",
   title = "Run Data",
   submitLabel = "Save Run",
 }: {
@@ -2891,6 +3600,7 @@ function RunLogForm({
   ) => void;
   onCancel: () => void;
   initialRun?: RunLog;
+  initialRearWeightBias?: string;
   title?: string;
   submitLabel?: string;
 }) {
@@ -2907,16 +3617,20 @@ function RunLogForm({
     rearTirePressure:
       initialRun?.rearTirePressure ?? "",
     rearWeightBias:
-      initialRun?.rearWeightBias ?? "",
+      initialRun?.rearWeightBias ?? initialRearWeightBias,
     sixtyFoot: initialRun?.sixtyFoot ?? "",
     threeThirty: initialRun?.threeThirty ?? "",
     eighthEt: initialRun?.eighthEt ?? "",
     eighthMph: initialRun?.eighthMph ?? "",
     notes: initialRun?.notes ?? "",
+    telemetry: initialRun?.telemetry ?? null,
   }));
 
   function update(
-    key: keyof Omit<RunLog, "id" | "createdAt">,
+    key: Exclude<
+      keyof Omit<RunLog, "id" | "createdAt">,
+      "telemetry"
+    >,
     value: string
   ) {
     setRun((current) => ({
@@ -2941,13 +3655,30 @@ function RunLogForm({
         <span>Everything is optional.</span>
       </div>
 
+      <RunTelemetryImporter
+        currentTelemetry={run.telemetry}
+        onClear={() =>
+          setRun((current) => ({ ...current, telemetry: null }))
+        }
+        onImported={(payload) =>
+          setRun((current) => ({
+            ...current,
+            telemetry: payload.telemetry,
+            sixtyFoot: payload.sixtyFoot || current.sixtyFoot,
+            threeThirty: payload.threeThirty || current.threeThirty,
+            eighthEt: payload.eighthEt || current.eighthEt,
+            eighthMph: payload.eighthMph || current.eighthMph,
+          }))
+        }
+      />
+
       <label className="run-field run-field-full">
         <span>Track / surface</span>
         <input
           type="text"
           value={run.trackSurface}
           placeholder="Airport asphalt"
-          onChange={(e) =>
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
             update("trackSurface", e.target.value)
           }
         />
@@ -3048,7 +3779,7 @@ function RunLogForm({
         <textarea
           value={run.notes}
           placeholder="Track came around, carried the front, small wheel speed..."
-          onChange={(e) =>
+          onChange={(e: ChangeEvent<HTMLTextAreaElement>) =>
             update("notes", e.target.value)
           }
         />
@@ -3096,7 +3827,7 @@ function RunField({
           type="text"
           inputMode={inputMode}
           value={value}
-          onChange={(e) =>
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
             onChange(e.target.value)
           }
         />
@@ -3130,13 +3861,18 @@ function BottomNav({
     },
     {
       id: "bar-change",
-      short: "Bar Change",
+      short: "Bar",
       label: "Theoretical Bar Change",
     },
     {
       id: "dynamic",
       short: "Dynamic",
       label: "Dynamic Geometry",
+    },
+    {
+      id: "modeling",
+      short: "Model(beta)",
+      label: "Modeling Beta",
     },
     {
       id: "garage",
@@ -3172,11 +3908,13 @@ function MeasurementField({
   label,
   value,
   help,
+  unit = "in",
   onChange,
 }: {
   label: string;
   value: string;
   help?: string;
+  unit?: string;
   onChange: (value: string) => void;
 }) {
   return (
@@ -3196,15 +3934,28 @@ function MeasurementField({
           type="number"
           step="0.001"
           value={value}
-          onChange={(e) =>
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
             onChange(e.target.value)
           }
           placeholder="0.000"
         />
 
-        <span>in</span>
+        {unit && <span>{unit}</span>}
       </div>
     </label>
+  );
+}
+
+function WeightSummary({ inputs }: { inputs: Inputs }) {
+  const weights = getWeightData(inputs);
+  if (!weights) return null;
+
+  return (
+    <div className="weight-summary">
+      <span>Front {(weights.frontBias * 100).toFixed(1)}%</span>
+      <strong>Rear {(weights.rearBias * 100).toFixed(1)}%</strong>
+      <span>Total {weights.totalWeight.toFixed(0)} lb</span>
+    </div>
   );
 }
 
@@ -3324,11 +4075,6 @@ function LadderResultGrid({
       </div>
 
       <div className="secondary-results ladder-secondary-results">
-        <ResultCard
-          label="Bar Angle"
-          value={`${result.barAngle.toFixed(2)}°`}
-        />
-
         <ResultCard
           label="Horizontal Length"
           value={`${result.horizontalRun.toFixed(2)}"`}

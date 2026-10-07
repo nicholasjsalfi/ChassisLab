@@ -1,0 +1,618 @@
+/* MODELING BETA */
+
+.model-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(310px, 0.55fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.model-main-panel,
+.model-side-panel {
+  min-width: 0;
+  padding: 22px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.import-log-button {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 14px;
+  color: var(--text);
+  background: var(--button-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 650;
+  overflow: hidden;
+}
+
+.import-log-button input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.model-diagram-card {
+  padding: 14px;
+  background: var(--plot-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.model-car-diagram-card {
+  overflow: hidden;
+}
+
+.model-tap-note {
+  color: var(--muted-2);
+  font-size: 9px;
+}
+
+.model-force-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 285px;
+}
+
+.model-car-svg {
+  overflow: visible;
+}
+
+.model-car-outline,
+.model-car-rocker {
+  fill: none;
+  stroke: #82909d;
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.94;
+}
+
+.model-car-rocker {
+  stroke-width: 2.8;
+  opacity: 0.5;
+}
+
+.model-car-detail-line,
+.model-car-glass-line,
+.model-car-arch-line {
+  fill: none;
+  stroke: #82909d;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.model-car-detail-line {
+  stroke-width: 1.15;
+  opacity: 0.42;
+}
+
+.model-car-glass-line {
+  stroke-width: 1.3;
+  opacity: 0.58;
+}
+
+.model-car-arch-line {
+  stroke-width: 1.35;
+  opacity: 0.42;
+}
+
+.model-ic-force-line {
+  stroke: var(--orange);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 6;
+  opacity: 0.7;
+}
+
+.model-live-link {
+  stroke-width: 5;
+  stroke-linecap: round;
+  cursor: pointer;
+  transition: stroke-width 120ms ease, opacity 120ms ease;
+}
+
+.model-live-link.selected {
+  stroke-width: 7;
+}
+
+.model-live-upper {
+  stroke: var(--blue);
+}
+
+.model-live-lower {
+  stroke: var(--green);
+}
+
+.model-live-pivot {
+  pointer-events: none;
+}
+
+.model-drive-force,
+.model-vertical-force {
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.model-drive-force {
+  stroke: var(--blue);
+}
+
+.model-vertical-force {
+  stroke: var(--green);
+}
+
+.model-drive-arrow-head {
+  fill: var(--blue);
+}
+
+.model-vertical-arrow-head {
+  fill: var(--green);
+}
+
+.model-node {
+  fill: var(--text-strong);
+  stroke: var(--plot-bg);
+  stroke-width: 2.5;
+  cursor: pointer;
+}
+
+.model-node.selected {
+  stroke: var(--blue);
+  stroke-width: 4;
+}
+
+.model-ic-node {
+  fill: var(--orange);
+}
+
+.model-cg-node {
+  fill: #a8b3bf;
+}
+
+.model-svg-label,
+.model-motion-label {
+  fill: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.model-motion-label {
+  font-size: 8.5px;
+  opacity: 0.8;
+}
+
+.model-live-readout {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 7px;
+  margin-top: 5px;
+}
+
+.model-live-readout span {
+  padding: 8px 9px;
+  color: var(--muted);
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  font-size: 9px;
+  text-align: center;
+}
+
+.model-live-readout strong {
+  color: var(--text);
+}
+
+.model-point-detail {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 12px;
+  margin-top: 9px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.model-point-detail strong {
+  font-size: 11px;
+}
+
+.model-point-detail > div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px 12px;
+}
+
+.model-point-detail span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.model-timeline-panel {
+  padding: 14px;
+  margin-top: 12px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.model-timeline-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.model-timeline-top > div {
+  text-align: right;
+}
+
+.model-timeline-top span {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.model-timeline-top strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 18px;
+}
+
+.model-play-button {
+  min-width: 80px;
+}
+
+.model-timeline-slider,
+.model-g-control input {
+  width: 100%;
+  accent-color: var(--blue);
+}
+
+.model-state-card {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.model-state-card > div,
+.model-source-card,
+.model-character-card,
+.model-g-control,
+.model-metric,
+.model-link-loads,
+.model-beta-note {
+  padding: 13px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.model-state-card span,
+.model-state-card strong,
+.model-state-card small,
+.model-source-card strong,
+.model-source-card span,
+.model-g-control span,
+.model-g-control strong,
+.model-metric span,
+.model-metric strong {
+  display: block;
+}
+
+.model-state-card span {
+  color: var(--muted-2);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.model-state-card strong {
+  margin-top: 4px;
+  font-size: 20px;
+}
+
+.model-state-card small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.separation-value {
+  color: var(--green);
+}
+
+.squat-value {
+  color: var(--orange);
+}
+
+.model-character-card {
+  margin-bottom: 10px;
+}
+
+.model-character-card > strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.model-character-row,
+.model-link-loads > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border-soft);
+}
+
+.model-character-row span,
+.model-link-loads span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.model-character-row b,
+.model-link-loads strong {
+  font-size: 9.5px;
+  text-align: right;
+}
+
+.model-source-card strong {
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
+.model-source-card span {
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.model-import-warning {
+  margin-top: 8px;
+  color: #d99b62 !important;
+}
+
+.model-g-control {
+  display: block;
+  margin-top: 10px;
+}
+
+.model-g-control span {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.model-g-control strong {
+  margin: 5px 0 9px;
+  font-size: 15px;
+}
+
+
+.model-assumption-card {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 13px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+}
+
+.model-assumption-card div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: baseline;
+}
+
+.model-assumption-card span,
+.model-assumption-card small {
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
+.model-assumption-card strong {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.model-limit-warning {
+  margin-top: 10px;
+  padding: 11px 12px;
+  color: #d99b62;
+  background: rgba(217, 155, 98, 0.08);
+  border: 1px solid rgba(217, 155, 98, 0.35);
+  border-radius: 8px;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.model-metric-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.model-metric span {
+  color: var(--muted-2);
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.model-metric strong {
+  margin-top: 4px;
+  font-size: 14px;
+}
+
+.model-metric.emphasis {
+  background: var(--selected-bg);
+  border-color: var(--selected-border);
+}
+
+.model-link-loads {
+  margin-top: 10px;
+}
+
+.model-link-loads .eyebrow {
+  margin-bottom: 8px;
+}
+
+.model-beta-note {
+  margin-top: 10px;
+}
+
+.model-beta-note strong {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 11px;
+}
+
+.model-beta-note p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.55;
+}
+
+
+@media (max-width: 850px) {
+  .model-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .app-shell {
+    width: min(100% - 16px, 640px);
+    padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 92px);
+  }
+
+  .app-header {
+    margin-left: -8px;
+    margin-right: -8px;
+    padding:
+      calc(env(safe-area-inset-top, 0px) + 12px)
+      8px 16px;
+  }
+
+  .bottom-nav {
+    width: calc(100% - 10px);
+  }
+
+  .bottom-nav button {
+    min-height: 46px;
+    font-size: 9px;
+  }
+
+  .optional-weight-heading,
+  .model-point-detail {
+    flex-direction: column;
+  }
+
+  .optional-weight-heading > span {
+    max-width: none;
+    text-align: left;
+  }
+
+  .weight-summary,
+  .model-metric-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .dynamic-cg-card {
+    grid-template-columns: 1fr;
+  }
+
+  .dynamic-cg-card small {
+    grid-column: auto;
+  }
+
+  .model-main-panel,
+  .model-side-panel {
+    padding: 16px;
+  }
+
+  .model-point-detail > div {
+    justify-content: flex-start;
+  }
+
+  .model-force-svg {
+    min-height: 220px;
+  }
+}
+
+/* MODELING V2.5.1 — supplied notchback trace + explicit Dragy import state */
+.model-car-image-group,
+.model-car-image {
+  pointer-events: none;
+}
+
+.model-car-image {
+  opacity: 0.52;
+}
+
+:root[data-theme="light"] .model-car-image {
+  filter: invert(1);
+  opacity: 0.5;
+}
+
+.model-import-error {
+  display: block;
+  margin-top: 9px;
+  padding: 10px;
+  color: #e3aa73;
+  background: rgba(217, 155, 98, 0.08);
+  border: 1px solid rgba(217, 155, 98, 0.32);
+  border-radius: 7px;
+}
+
+.model-import-error strong,
+.model-import-error span,
+.model-import-error a {
+  display: block;
+}
+
+.model-import-error strong {
+  margin-bottom: 4px;
+  color: #e7b17d;
+  font-size: 10px;
+}
+
+.model-import-error span {
+  color: var(--muted);
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+
+.model-import-error a {
+  width: fit-content;
+  margin-top: 8px;
+  color: var(--blue-soft);
+  font-size: 9.5px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.model-import-error a:hover {
+  text-decoration: underline;
+}
