@@ -5,6 +5,7 @@ import { normalizeCars } from "../storage/garageData";
 
 export type CloudGarageState = {
   configured: boolean;
+  userId: string | null;
   userEmail: string | null;
   syncing: boolean;
   hydrated: boolean;
@@ -44,7 +45,11 @@ export function useCloudGarageSync(
   }, [cars]);
 
   const pushGarage = useCallback(
-    async (targetUserId: string, nextCars = carsRef.current) => {
+    async (
+      targetUserId: string,
+      nextCars = carsRef.current,
+      targetEmail: string | null = null
+    ) => {
       if (!supabase) return;
 
       setSyncing(true);
@@ -52,6 +57,7 @@ export function useCloudGarageSync(
         const { error } = await supabase.from("chassislab_garages").upsert(
           {
             user_id: targetUserId,
+            email: targetEmail,
             garage: cleanGarageForCloud(nextCars),
             updated_at: new Date().toISOString(),
           },
@@ -77,7 +83,10 @@ export function useCloudGarageSync(
   );
 
   const hydrateFromCloud = useCallback(
-    async (targetUserId: string) => {
+    async (
+      targetUserId: string,
+      targetEmail: string | null
+    ) => {
       if (!supabase) return;
 
       setSyncing(true);
@@ -92,12 +101,33 @@ export function useCloudGarageSync(
         if (error) throw error;
 
         if (data?.garage && Array.isArray(data.garage)) {
+          const cloudCars = normalizeCars(data.garage);
+
           skipNextPush.current = true;
-          setCars(normalizeCars(data.garage));
+          carsRef.current = cloudCars;
+          setCars(cloudCars);
+
+          await pushGarage(
+            targetUserId,
+            cloudCars,
+            targetEmail
+          );
+
           setStatus("Cloud Garage loaded on this device.");
         } else {
-          await pushGarage(targetUserId, carsRef.current);
-          setStatus("This device's Garage was uploaded to your account.");
+          const emptyGarage: Car[] = [];
+
+          skipNextPush.current = true;
+          carsRef.current = emptyGarage;
+          setCars(emptyGarage);
+
+          await pushGarage(
+            targetUserId,
+            emptyGarage,
+            targetEmail
+          );
+
+          setStatus("New cloud Garage created for this account.");
         }
 
         setHydrated(true);
@@ -125,7 +155,10 @@ export function useCloudGarageSync(
       setUserId(user?.id ?? null);
       setUserEmail(user?.email ?? null);
       if (user) {
-        void hydrateFromCloud(user.id);
+        void hydrateFromCloud(
+          user.id,
+          user.email ?? null
+        );
       }
     });
 
@@ -135,7 +168,10 @@ export function useCloudGarageSync(
       setUserEmail(user?.email ?? null);
 
       if (user) {
-        void hydrateFromCloud(user.id);
+        void hydrateFromCloud(
+          user.id,
+          user.email ?? null
+        );
       } else {
         setHydrated(false);
         setStatus("Signed out. Garage remains saved on this device.");
@@ -161,7 +197,11 @@ export function useCloudGarageSync(
     }
 
     debounceRef.current = window.setTimeout(() => {
-      void pushGarage(userId, carsRef.current);
+      void pushGarage(
+        userId,
+        carsRef.current,
+        userEmail
+      );
     }, 900);
 
     return () => {
@@ -169,7 +209,7 @@ export function useCloudGarageSync(
         window.clearTimeout(debounceRef.current);
       }
     };
-  }, [cars, hydrated, pushGarage, userId]);
+  }, [cars, hydrated, pushGarage, userEmail, userId]);
 
   async function signIn(email: string, password: string) {
     if (!supabase) {
@@ -229,11 +269,16 @@ export function useCloudGarageSync(
       setStatus("Sign in before syncing.");
       return;
     }
-    await pushGarage(userId, carsRef.current);
+    await pushGarage(
+      userId,
+      carsRef.current,
+      userEmail
+    );
   }
 
   return {
     configured: cloudConfigured,
+    userId,
     userEmail,
     syncing,
     hydrated,

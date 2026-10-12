@@ -10,16 +10,25 @@ export const emptyInputs: Inputs = {
   upperLength: "",
   upperFrontHeight: "",
   upperRearHeight: "",
+  upperRearX: "0",
   lowerLength: "",
   lowerFrontHeight: "",
   lowerRearHeight: "",
+  lowerRearX: "0",
   ladderLength: "",
   ladderFrontHeight: "",
+  ladderRearUpperHeight: "",
+  ladderRearLowerHeight: "",
+  ladderRearUpperX: "0",
+  ladderRearLowerX: "0",
   wheelbase: "",
   cgHeight: "",
   tireDiameter: "",
   frontWeight: "",
   rearWeight: "",
+  frontTravelAvailable: "5.0",
+  rearSpringRate: "",
+  rearSpringMotionRatio: "1.0",
 };
 
 export function makeId() {
@@ -51,6 +60,14 @@ export function normalizeCars(value: unknown): Car[] {
         typeof raw.holeSpacing === "string" && raw.holeSpacing.trim() !== ""
           ? raw.holeSpacing
           : DEFAULT_HOLE_SPACING,
+      surfaces: Array.isArray(raw.surfaces) ? raw.surfaces.map((surface) => ({
+        id: surface.id ?? makeId(),
+        name: surface.name ?? "Untitled Surface",
+        date: surface.date ?? "",
+        rating: Number.isFinite(Number(surface.rating)) ? Math.max(1, Math.min(10, Number(surface.rating))) : 5,
+        lane: surface.lane ?? "",
+        notes: surface.notes ?? "",
+      })) : [],
       savedSetups: Array.isArray(raw.savedSetups)
         ? raw.savedSetups.map((setup) => ({
             ...setup,
@@ -67,6 +84,9 @@ export function normalizeCars(value: unknown): Car[] {
               id: run.id ?? makeId(),
               createdAt: run.createdAt ?? new Date().toISOString(),
               trackSurface: run.trackSurface ?? "",
+              sessionName: run.sessionName ?? "",
+              surfaceId: run.surfaceId ?? "",
+              surfaceSnapshot: run.surfaceSnapshot ?? null,
               frontRebound: run.frontRebound ?? "",
               frontCompression: run.frontCompression ?? "",
               rearRebound: run.rearRebound ?? "",

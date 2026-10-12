@@ -1,3 +1,4 @@
+import JSZip from "jszip";
 import type {
   DragyPoint,
   RunTelemetry,
@@ -111,7 +112,7 @@ function parseNativeDragyJson(
   if (!parsed || typeof parsed !== "object") return null;
 
   const root = parsed as Record<string, unknown>;
-  const dataInfo = root.dataInfo;
+  const dataInfo = root.dataInfo ?? root.datainfo;
   if (!dataInfo || typeof dataInfo !== "object") return null;
 
   const info = dataInfo as Record<string, unknown>;
@@ -126,7 +127,9 @@ function parseNativeDragyJson(
 
     const time = numeric(row.time);
     const speedKmh = numeric(row.speed);
-    const accelerationG = numeric(row.acceleration);
+    const accelerationG = numeric(
+      row.avgAcceleraion ?? row.avgAcceleration ?? row.acceleration ?? row.g
+    );
 
     if (!Number.isFinite(time)) continue;
 
@@ -440,14 +443,64 @@ function looksEncrypted(bytes: Uint8Array) {
   return printable / sampleLength < 0.35 && bytes.length % 16 === 0;
 }
 
-/**
- * Native encrypted .dragy decryption belongs here once the Dragy cipher/key
- * derivation is verified. We intentionally do not guess a key or silently send
- * the file to a third-party service. The rest of the import pipeline is already
- * isolated so a verified local decryptor can be dropped into this function.
- */
-async function tryDecryptNativeDragy(_bytes: Uint8Array): Promise<string | null> {
-  return null;
+const DRAGY_KEY = new Uint8Array([0x69,0x32,0x46,0x6c,0x65,0x5a,0x6e,0x64,0,0,0,0,0,0,0,0]);
+const DRAGY_IV = new Uint8Array([0x69,0x33,0x65,0x76,0x38,0x6c,0x65,0x6e,0,0,0,0,0,0,0,0]);
+
+async function tryDecryptNativeDragy(bytes: Uint8Array): Promise<string | null> {
+  try {
+    console.log("[Dragy] encrypted bytes:", bytes.length);
+    console.log("[Dragy] crypto.subtle available:", Boolean(globalThis.crypto?.subtle));
+
+    const key = await crypto.subtle.importKey(
+      "raw",
+      DRAGY_KEY,
+      { name: "AES-CBC" },
+      false,
+      ["decrypt"]
+    );
+
+    console.log("[Dragy] AES key imported");
+
+    const decryptBytes = Uint8Array.from(bytes);
+
+    const decrypted = await crypto.subtle.decrypt(
+      {
+        name: "AES-CBC",
+        iv: Uint8Array.from(DRAGY_IV),
+      },
+      key,
+      decryptBytes.buffer
+    );
+
+    console.log("[Dragy] decrypted bytes:", decrypted.byteLength);
+
+    const decoded = new TextDecoder().decode(decrypted);
+
+    console.log("[Dragy] decrypted preview:", decoded.slice(0, 300));
+
+    try {
+      const parsed = JSON.parse(decoded);
+      console.log("[Dragy] JSON parsed successfully");
+      console.log("[Dragy] top-level keys:", Object.keys(parsed ?? {}));
+    } catch (jsonError) {
+      console.error("[Dragy] JSON parse failed:", jsonError);
+    }
+
+    return decoded;
+  } catch (error) {
+    console.error("[Dragy] DECRYPTION FAILED:", error);
+    return null;
+  }
+}
+
+function normalizeDecryptedDragyText(text: string) {
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    if (Array.isArray(parsed) && parsed.length > 0) return JSON.stringify(parsed[0]);
+  } catch {
+    // Let the normal parser report the failure.
+  }
+  return text;
 }
 
 export async function parseTelemetryFile(file: File): Promise<TelemetryFileResult> {
@@ -459,12 +512,19 @@ export async function parseTelemetryFile(file: File): Promise<TelemetryFileResul
     bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b;
 
   if (extension === "json") {
-    const telemetry = parseTelemetryJson(text, file.name);
+    let telemetry = parseTelemetryJson(text, file.name);
+    if (!telemetry && looksEncrypted(bytes)) {
+      const decryptedText = await tryDecryptNativeDragy(bytes);
+      if (decryptedText) {
+        telemetry = parseTelemetryJson(normalizeDecryptedDragyText(decryptedText), file.name);
+        if (telemetry) telemetry.source = "dragy-encrypted";
+      }
+    }
     return {
       points: telemetry?.points ?? [],
       telemetry,
       message: telemetry
-        ? `${telemetry.source === "dragy-json" ? "Dragy JSON" : "JSON"} telemetry`
+        ? `${telemetry.source === "dragy-encrypted" ? "Encrypted Dragy" : telemetry.source === "dragy-json" ? "Dragy JSON" : "JSON"} telemetry`
         : "No usable telemetry found in this JSON file.",
       needsConversion: false,
     };
@@ -504,38 +564,81 @@ export async function parseTelemetryFile(file: File): Promise<TelemetryFileResul
       };
     }
 
-    if (looksEncrypted(bytes)) {
+    if (bytes.length >= 16 && bytes.length % 16 === 0) {
       const decryptedText = await tryDecryptNativeDragy(bytes);
-      if (decryptedText) {
-        const telemetry = parseTelemetryJson(decryptedText, file.name);
-        if (telemetry) {
-          return {
-            points: telemetry.points,
-            telemetry,
-            message: "Encrypted Dragy telemetry decrypted locally",
-            needsConversion: false,
-          };
-        }
+
+      if (!decryptedText) {
+        return {
+          points: [],
+          telemetry: null,
+          message: `DRAGY DEBUG: AES decryption FAILED. Encrypted file size: ${bytes.length} bytes.`,
+          needsConversion: false,
+        };
       }
+
+      const preview = decryptedText.slice(0, 120).replace(/\s+/g, " ");
+
+      let jsonValid = false;
+      let topKeys = "";
+      try {
+        const debugParsed = JSON.parse(decryptedText);
+        jsonValid = true;
+        topKeys =
+          debugParsed && typeof debugParsed === "object"
+            ? Object.keys(debugParsed).slice(0, 12).join(", ")
+            : "";
+      } catch {
+        jsonValid = false;
+      }
+
+      const normalized = normalizeDecryptedDragyText(decryptedText);
+      const telemetry = parseTelemetryJson(normalized, file.name);
+
+      if (telemetry) {
+        telemetry.source = "dragy-encrypted";
+        return {
+          points: telemetry.points,
+          telemetry,
+          message: `SUCCESS: Dragy decrypted and parsed — ${telemetry.points.length} telemetry points.`,
+          needsConversion: false,
+        };
+      }
+
+      return {
+        points: [],
+        telemetry: null,
+        message:
+          `DRAGY DEBUG: AES SUCCESS, parser FAILED. ` +
+          `JSON valid: ${jsonValid}. ` +
+          `Top keys: ${topKeys || "(none)"}. ` +
+          `Preview: ${preview}`,
+        needsConversion: false,
+      };
     }
 
     return {
       points: [],
       telemetry: null,
       message:
-        "Encrypted Dragy file detected. ChassisLab accepted the file, but native decryption is not enabled until the Dragy cipher/key handling is verified. Nothing was uploaded or applied to the G trace.",
-      needsConversion: true,
+        `DRAGY DEBUG: File was NOT recognized as encrypted. Size: ${bytes.length} bytes. Mod16: ${bytes.length % 16}.`,
+      needsConversion: false,
     };
   }
 
   if (extension === "zip" || looksLikeZip) {
-    return {
-      points: [],
-      telemetry: null,
-      message:
-        "Dragy/iOS ZIP detected. Native encrypted-archive decoding is not enabled yet, so no telemetry was applied.",
-      needsConversion: true,
-    };
+    try {
+      const zip = await JSZip.loadAsync(buffer);
+      const entry = Object.values(zip.files).find((candidate) => !candidate.dir && /\.(dragy|json)$/i.test(candidate.name));
+      if (!entry) throw new Error("No Dragy payload found");
+      const payload = await entry.async("uint8array");
+      const payloadName = entry.name.split("/").pop() || entry.name;
+      const payloadBytes = Uint8Array.from(payload);
+      const payloadFile = new File([payloadBytes.buffer], payloadName, { type: "application/octet-stream" });
+      const result = await parseTelemetryFile(payloadFile);
+      return result.telemetry ? { ...result, message: `Dragy ZIP → ${result.message}` } : result;
+    } catch {
+      return { points: [], telemetry: null, message: "The ZIP did not contain a readable Dragy .dragy/.json payload.", needsConversion: false };
+    }
   }
 
   const csvPoints = parseDragyCsv(text);

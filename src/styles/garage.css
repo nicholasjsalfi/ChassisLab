@@ -843,3 +843,26 @@ html {
   font-size: 8px;
   font-weight: 700;
 }
+
+/* v3.1 race-day workflow */
+.run-session-line {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 700;
+}
+.run-field select {
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 10px;
+  color: var(--text);
+  background: var(--panel-deep);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+.surface-entry-card { margin-bottom: 16px; }
+.surface-list { display: grid; gap: 10px; }
+.surface-card { position: relative; display: grid; gap: 7px; }
+.surface-card span { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; }
+.surface-rating { width: fit-content; padding: 5px 8px; border: 1px solid var(--selected-border); border-radius: 6px; background: var(--selected-bg); color: var(--blue-soft); font-size: 9px; font-weight: 800; }
+.surface-card .run-delete { position: absolute; top: 10px; right: 10px; }

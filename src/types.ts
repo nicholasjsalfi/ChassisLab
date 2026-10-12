@@ -1,17 +1,28 @@
 export type SuspensionType = "4-link" | "ladder-bar";
-export type Tab = "calculator" | "bar-change" | "dynamic" | "modeling" | "garage";
+export type Tab = "calculator" | "bar-change" | "dynamic" | "modeling" | "surface" | "data-log"
+  | "garage";
 export type ThemePreference = "system" | "dark" | "light";
 
 export type Inputs = {
   upperLength: string;
   upperFrontHeight: string;
   upperRearHeight: string;
+  /** Rear upper pivot fore/aft location from axle centerline. Positive = forward. */
+  upperRearX: string;
+
   lowerLength: string;
   lowerFrontHeight: string;
   lowerRearHeight: string;
+  /** Rear lower pivot fore/aft location from axle centerline. Positive = forward. */
+  lowerRearX: string;
 
+  /** Axle-center to front-pivot physical distance. */
   ladderLength: string;
   ladderFrontHeight: string;
+  ladderRearUpperHeight: string;
+  ladderRearLowerHeight: string;
+  ladderRearUpperX: string;
+  ladderRearLowerX: string;
 
   wheelbase: string;
   cgHeight: string;
@@ -19,15 +30,24 @@ export type Inputs = {
 
   frontWeight: string;
   rearWeight: string;
+
+  /** Maximum available front suspension extension used by the model. */
+  frontTravelAvailable: string;
+  /** Optional physical spring rate for each rear coilover. */
+  rearSpringRate: string;
+  /** spring/shock travel divided by wheel travel; 1.0 for direct acting. */
+  rearSpringMotionRatio: string;
 };
 
 export type NumericInputs = {
   upperLength: number;
   upperFrontHeight: number;
   upperRearHeight: number;
+  upperRearX: number;
   lowerLength: number;
   lowerFrontHeight: number;
   lowerRearHeight: number;
+  lowerRearX: number;
   wheelbase: number;
   cgHeight: number;
   tireDiameter: number;
@@ -36,6 +56,10 @@ export type NumericInputs = {
 export type LadderInputs = {
   ladderLength: number;
   ladderFrontHeight: number;
+  ladderRearUpperHeight: number;
+  ladderRearLowerHeight: number;
+  ladderRearUpperX: number;
+  ladderRearLowerX: number;
   wheelbase: number;
   cgHeight: number;
   tireDiameter: number;
@@ -47,6 +71,7 @@ export type LadderResult = {
   icLength: number;
   icHeight: number;
   antiSquat: number;
+  rearSpread: number | null;
 };
 
 export type LadderCalcResult = LadderResult | { error: string } | null;
@@ -61,6 +86,8 @@ export type SuccessfulResult = {
   icLength: number;
   icHeight: number;
   antiSquat: number;
+  rearSpread: number;
+  frontSpread: number;
 };
 
 export type CalcResult = SuccessfulResult | { error: string } | null;
@@ -79,17 +106,39 @@ export type TelemetrySplits = {
 };
 
 export type RunTelemetry = {
-  source: "dragy-json" | "dragy-csv" | "csv" | "json" | "vbo" | "dragy-readable";
+  source: "dragy-json" | "dragy-csv" | "csv" | "json" | "vbo" | "dragy-readable" | "dragy-encrypted";
   fileName: string;
   importedAt: string;
   points: DragyPoint[];
   splits: TelemetrySplits;
 };
 
+
+export type SurfaceRecord = {
+  id: string;
+  name: string;
+  date: string;
+  rating: number;
+  lane: string;
+  notes: string;
+};
+
+export type SurfaceSnapshot = {
+  surfaceId?: string;
+  name: string;
+  date: string;
+  rating: number | null;
+  lane: string;
+  notes: string;
+};
+
 export type RunLog = {
   id: string;
   createdAt: string;
   trackSurface: string;
+  sessionName: string;
+  surfaceId: string;
+  surfaceSnapshot?: SurfaceSnapshot | null;
   frontRebound: string;
   frontCompression: string;
   rearRebound: string;
@@ -120,6 +169,7 @@ export type Car = {
   calculatorInputs: Inputs;
   holeSpacing: string;
   savedSetups: SavedSetup[];
+  surfaces?: SurfaceRecord[];
 };
 
 export type WeightData = {

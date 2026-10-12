@@ -70,9 +70,7 @@ export function RunTelemetryImporter({
         <div>
           <span>Dragy / telemetry</span>
           <small>
-            Import a decrypted Dragy JSON/CSV or VBO. Native encrypted .dragy
-            detection is included, but decryption is only enabled after the
-            cipher/key handling is verified.
+            Import the original encrypted .dragy file directly. Dragy ZIP, JSON/CSV and VBO are also supported; decryption stays on this device.
           </small>
         </div>
 

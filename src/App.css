@@ -2,3 +2,1473 @@
 @import "./styles/calculator.css";
 @import "./styles/garage.css";
 @import "./styles/modeling.css";
+
+
+/* ===== ChassisLab Advanced Data Log ===== */
+
+.datalog-screen {
+  display: grid;
+  gap: 16px;
+}
+
+.datalog-imports {
+  display: grid;
+  grid-template-columns:
+    1fr 1fr;
+  gap: 12px;
+}
+
+.datalog-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  border:
+    1px solid
+    rgba(
+      127,
+      127,
+      127,
+      0.2
+    );
+  border-radius: 14px;
+}
+
+.datalog-slot
+  > div:first-child {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  margin-right: auto;
+}
+
+.datalog-slot span {
+  font-size: 12px;
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 38vw;
+}
+
+.datalog-file-button input {
+  display: none;
+}
+
+.datalog-note {
+  grid-column:
+    1 / -1;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.datalog-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.segmented-control {
+  display: flex;
+  padding: 3px;
+  border:
+    1px solid
+    rgba(
+      127,
+      127,
+      127,
+      0.25
+    );
+  border-radius: 10px;
+}
+
+.segmented-control button {
+  border: 0;
+  background: transparent;
+  padding: 7px 12px;
+  border-radius: 7px;
+  color: inherit;
+}
+
+.segmented-control
+  button.active {
+  background:
+    rgba(
+      127,
+      127,
+      127,
+      0.18
+    );
+}
+
+.datalog-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 10px;
+  font-size: 12px;
+}
+
+.datalog-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.datalog-legend small {
+  margin-left: auto;
+  font-variant-numeric:
+    tabular-nums;
+}
+
+.datalog-legend i {
+  width: 18px;
+  height: 3px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.legend-a {
+  background: #38bdf8;
+}
+
+.legend-b {
+  background: #f97316;
+}
+
+.datalog-chart {
+  height: 330px;
+  touch-action: none;
+  cursor: crosshair;
+  border-radius: 12px;
+  overflow: hidden;
+  background:
+    rgba(
+      127,
+      127,
+      127,
+      0.035
+    );
+}
+
+.datalog-chart svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.datalog-grid {
+  stroke: currentColor;
+  opacity: 0.08;
+  stroke-width: 1;
+}
+
+.trace {
+  fill: none;
+  stroke-width: 3;
+  vector-effect:
+    non-scaling-stroke;
+}
+
+.trace-a {
+  stroke: #38bdf8;
+}
+
+.trace-b {
+  stroke: #f97316;
+}
+
+.g-trace {
+  stroke-dasharray:
+    8 5;
+  opacity: 0.9;
+}
+
+.datalog-cursor {
+  stroke: currentColor;
+  stroke-width: 1.5;
+  opacity: 0.75;
+  vector-effect:
+    non-scaling-stroke;
+}
+
+.datalog-scrubber {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.datalog-split-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.datalog-split-row button {
+  border:
+    1px solid
+    rgba(
+      127,
+      127,
+      127,
+      0.25
+    );
+  background: transparent;
+  color: inherit;
+  border-radius: 999px;
+  padding: 6px 11px;
+}
+
+.datalog-readout-grid {
+  display: grid;
+  grid-template-columns:
+    1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.datalog-summary-grid {
+  display: grid;
+  grid-template-columns:
+    1fr 1fr;
+  gap: 12px;
+}
+
+.datalog-readout,
+.datalog-summary {
+  display: grid;
+  gap: 9px;
+}
+
+.datalog-readout.delta {
+  background:
+    rgba(
+      127,
+      127,
+      127,
+      0.045
+    );
+}
+
+.datalog-metric {
+  display: flex;
+  justify-content:
+    space-between;
+  gap: 16px;
+  font-variant-numeric:
+    tabular-nums;
+}
+
+.datalog-metric span {
+  opacity: 0.62;
+  font-size: 12px;
+}
+
+.datalog-metric b {
+  font-size: 13px;
+}
+
+/*
+  Cleaner stacked bottom
+  navigation: three columns
+  instead of five + one.
+*/
+
+.bottom-nav {
+  display: grid !important;
+  grid-template-columns:
+    repeat(
+      3,
+      minmax(0, 1fr)
+    ) !important;
+  height: auto !important;
+}
+
+.bottom-nav button {
+  min-width: 0 !important;
+  white-space: nowrap;
+}
+
+@media (
+  max-width: 720px
+) {
+  .datalog-imports,
+  .datalog-readout-grid,
+  .datalog-summary-grid {
+    grid-template-columns:
+      1fr;
+  }
+
+  .datalog-slot span {
+    max-width: 48vw;
+  }
+
+  .datalog-chart {
+    height: 285px;
+  }
+}
+
+/* =========================================================
+   COMPACT BOTTOM NAV
+   ========================================================= */
+
+.bottom-nav {
+  display: flex !important;
+  grid-template-columns: none !important;
+  flex-wrap: nowrap !important;
+  align-items: center;
+  gap: 2px;
+  height: 46px !important;
+  min-height: 46px !important;
+  padding: 4px 6px !important;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.bottom-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.bottom-nav button {
+  flex: 1 0 auto;
+  min-width: 54px !important;
+  height: 36px !important;
+  padding: 4px 7px !important;
+  margin: 0 !important;
+  border-radius: 8px !important;
+  font-size: 10px !important;
+  line-height: 1.05 !important;
+  white-space: nowrap;
+}
+
+/* On wider screens fit all seven tabs across the bottom */
+@media (min-width: 700px) {
+  .bottom-nav button {
+    flex: 1 1 0;
+    min-width: 0 !important;
+    font-size: 11px !important;
+  }
+}
+
+
+/* =========================================================
+   DATA LOG GRAPH AXES + TRACK MARKERS
+   ========================================================= */
+
+.datalog-axis-label {
+  fill: currentColor;
+  font-size: 11px;
+  font-weight: 500;
+  opacity: 0.42;
+  pointer-events: none;
+  user-select: none;
+}
+
+.datalog-axis-title {
+  fill: currentColor;
+  font-size: 10px;
+  font-weight: 700;
+  opacity: 0.6;
+  text-transform: uppercase;
+  pointer-events: none;
+}
+
+.datalog-axis-bottom {
+  font-size: 9px;
+  opacity: 0.36;
+}
+
+.datalog-axis-left {
+  dominant-baseline: auto;
+}
+
+.datalog-axis-right {
+  dominant-baseline: auto;
+}
+
+.datalog-split-marker {
+  stroke: currentColor;
+  stroke-width: 1;
+  stroke-dasharray: 5 7;
+  opacity: 0.13;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.datalog-split-label {
+  fill: currentColor;
+  font-size: 9px;
+  font-weight: 600;
+  opacity: 0.27;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Keep actual telemetry visually above the reference grid */
+.datalog-chart .trace {
+  position: relative;
+}
+
+/* Slightly soften normal grid now that axes are labeled */
+.datalog-grid {
+  opacity: 0.055;
+}
+
+
+/* =========================================================
+   DATA LOG V3 — EXTERNAL AXES + DUAL SPLIT MARKERS
+   ========================================================= */
+
+/*
+  Three-column plot:
+  G scale | telemetry graph | MPH scale
+*/
+
+.datalog-plot-layout {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 42px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.datalog-plot-layout .datalog-chart {
+  min-width: 0;
+  width: 100%;
+}
+
+/* Dedicated blank axis gutters */
+
+.datalog-y-axis {
+  position: relative;
+  height: 330px;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.datalog-g-axis {
+  border-right: 1px solid rgba(127, 127, 127, 0.12);
+}
+
+.datalog-mph-axis {
+  border-left: 1px solid rgba(127, 127, 127, 0.12);
+}
+
+.datalog-y-axis-title {
+  position: absolute;
+  top: 5px;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+  opacity: 0.48;
+  text-transform: uppercase;
+}
+
+.datalog-g-axis .datalog-y-axis-title {
+  left: 4px;
+}
+
+.datalog-mph-axis .datalog-y-axis-title {
+  right: 3px;
+}
+
+.datalog-y-tick {
+  position: absolute;
+  transform: translateY(-50%);
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.48;
+  white-space: nowrap;
+}
+
+.datalog-g-axis .datalog-y-tick {
+  right: 6px;
+  text-align: right;
+}
+
+.datalog-mph-axis .datalog-y-tick {
+  left: 6px;
+  text-align: left;
+}
+
+/*
+  The first and last ticks sit at the exact top/bottom.
+  Keep them from visually clipping.
+*/
+
+.datalog-y-axis .datalog-y-tick:first-of-type {
+  transform: translateY(3px);
+}
+
+.datalog-y-axis .datalog-y-tick:last-of-type {
+  transform: translateY(calc(-100% - 3px));
+}
+
+/* Split markers remain intentionally subtle */
+
+.datalog-split-marker {
+  stroke-width: 1;
+  stroke-dasharray: 4 7;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+/* Distance mode */
+
+.datalog-split-marker.split-distance {
+  stroke: currentColor;
+  opacity: 0.12;
+}
+
+.split-label-distance {
+  fill: currentColor;
+  opacity: 0.28;
+}
+
+/*
+  Time comparison:
+  A and B get separate marker styles so close split
+  times are still distinguishable.
+*/
+
+.datalog-split-marker.split-A {
+  stroke: #38bdf8;
+  opacity: 0.20;
+}
+
+.datalog-split-marker.split-B {
+  stroke: #f97316;
+  opacity: 0.20;
+}
+
+.split-label-A {
+  fill: #38bdf8;
+  opacity: 0.55;
+}
+
+.split-label-B {
+  fill: #f97316;
+  opacity: 0.55;
+}
+
+.datalog-split-label {
+  font-size: 8px;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+}
+
+/*
+  Old in-SVG axis classes are intentionally hidden.
+  Axis values now live in the gutters.
+*/
+
+.datalog-axis-label,
+.datalog-axis-title {
+  display: none;
+}
+
+/* Mobile keeps gutters compact */
+
+@media (max-width: 720px) {
+  .datalog-plot-layout {
+    grid-template-columns: 34px minmax(0, 1fr) 38px;
+  }
+
+  .datalog-y-axis {
+    height: 285px;
+  }
+
+  .datalog-y-tick {
+    font-size: 8px;
+  }
+
+  .datalog-y-axis-title {
+    font-size: 8px;
+  }
+}
+
+
+/* =========================================================
+   DATA LOG V3 — EXTERNAL AXES + DUAL SPLIT MARKERS
+   ========================================================= */
+
+/*
+  Three-column plot:
+  G scale | telemetry graph | MPH scale
+*/
+
+.datalog-plot-layout {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) 42px;
+  align-items: stretch;
+  width: 100%;
+}
+
+.datalog-plot-layout .datalog-chart {
+  min-width: 0;
+  width: 100%;
+}
+
+/* Dedicated blank axis gutters */
+
+.datalog-y-axis {
+  position: relative;
+  height: 330px;
+  overflow: visible;
+  pointer-events: none;
+  user-select: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.datalog-g-axis {
+  border-right: 1px solid rgba(127, 127, 127, 0.12);
+}
+
+.datalog-mph-axis {
+  border-left: 1px solid rgba(127, 127, 127, 0.12);
+}
+
+.datalog-y-axis-title {
+  position: absolute;
+  top: 5px;
+  font-size: 9px;
+  line-height: 1;
+  font-weight: 700;
+  opacity: 0.48;
+  text-transform: uppercase;
+}
+
+.datalog-g-axis .datalog-y-axis-title {
+  left: 4px;
+}
+
+.datalog-mph-axis .datalog-y-axis-title {
+  right: 3px;
+}
+
+.datalog-y-tick {
+  position: absolute;
+  transform: translateY(-50%);
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.48;
+  white-space: nowrap;
+}
+
+.datalog-g-axis .datalog-y-tick {
+  right: 6px;
+  text-align: right;
+}
+
+.datalog-mph-axis .datalog-y-tick {
+  left: 6px;
+  text-align: left;
+}
+
+/*
+  The first and last ticks sit at the exact top/bottom.
+  Keep them from visually clipping.
+*/
+
+.datalog-y-axis .datalog-y-tick:first-of-type {
+  transform: translateY(3px);
+}
+
+.datalog-y-axis .datalog-y-tick:last-of-type {
+  transform: translateY(calc(-100% - 3px));
+}
+
+/* Split markers remain intentionally subtle */
+
+.datalog-split-marker {
+  stroke-width: 1;
+  stroke-dasharray: 4 7;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+/* Distance mode */
+
+.datalog-split-marker.split-distance {
+  stroke: currentColor;
+  opacity: 0.12;
+}
+
+.split-label-distance {
+  fill: currentColor;
+  opacity: 0.28;
+}
+
+/*
+  Time comparison:
+  A and B get separate marker styles so close split
+  times are still distinguishable.
+*/
+
+.datalog-split-marker.split-A {
+  stroke: #38bdf8;
+  opacity: 0.20;
+}
+
+.datalog-split-marker.split-B {
+  stroke: #f97316;
+  opacity: 0.20;
+}
+
+.split-label-A {
+  fill: #38bdf8;
+  opacity: 0.55;
+}
+
+.split-label-B {
+  fill: #f97316;
+  opacity: 0.55;
+}
+
+.datalog-split-label {
+  font-size: 8px;
+  font-weight: 600;
+  pointer-events: none;
+  user-select: none;
+}
+
+/*
+  Old in-SVG axis classes are intentionally hidden.
+  Axis values now live in the gutters.
+*/
+
+.datalog-axis-label,
+.datalog-axis-title {
+  display: none;
+}
+
+/* Mobile keeps gutters compact */
+
+@media (max-width: 720px) {
+  .datalog-plot-layout {
+    grid-template-columns: 34px minmax(0, 1fr) 38px;
+  }
+
+  .datalog-y-axis {
+    height: 285px;
+  }
+
+  .datalog-y-tick {
+    font-size: 8px;
+  }
+
+  .datalog-y-axis-title {
+    font-size: 8px;
+  }
+}
+
+
+/* =========================================================
+   DATA LOG — SCALE CONTROLS
+   ========================================================= */
+
+.datalog-scale-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  min-width: 0;
+}
+
+.datalog-scale-label {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.datalog-scale-control select {
+  height: 28px;
+  min-width: 92px;
+  padding: 2px 24px 2px 7px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.datalog-scale-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.datalog-scale-input input {
+  width: 58px;
+  height: 28px;
+  padding: 2px 5px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.datalog-scale-input span {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+@media (max-width: 600px) {
+  .datalog-scale-control {
+    gap: 4px;
+  }
+
+  .datalog-scale-control select {
+    min-width: 82px;
+    font-size: 10px;
+  }
+
+  .datalog-scale-input input {
+    width: 52px;
+  }
+}
+
+
+/* =========================================================
+   DATA LOG — SCALE CONTROLS
+   ========================================================= */
+
+.datalog-scale-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 5px;
+  min-width: 0;
+}
+
+.datalog-scale-label {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+.datalog-scale-control select {
+  height: 28px;
+  min-width: 92px;
+  padding: 2px 24px 2px 7px;
+  border-radius: 7px;
+  font-size: 11px;
+}
+
+.datalog-scale-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.datalog-scale-input input {
+  width: 58px;
+  height: 28px;
+  padding: 2px 5px;
+  border-radius: 7px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.datalog-scale-input span {
+  font-size: 10px;
+  opacity: 0.5;
+}
+
+@media (max-width: 600px) {
+  .datalog-scale-control {
+    gap: 4px;
+  }
+
+  .datalog-scale-control select {
+    min-width: 82px;
+    font-size: 10px;
+  }
+
+  .datalog-scale-input input {
+    width: 52px;
+  }
+}
+
+
+/* =========================================================
+   DATA LOG — CHANNEL SCALE CONTROLS V2
+   ========================================================= */
+
+.datalog-channel-control {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 145px;
+}
+
+.datalog-channel-check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.datalog-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.datalog-scale-word {
+  font-size: 9px;
+  opacity: 0.45;
+}
+
+.datalog-scale-row select {
+  height: 27px;
+  padding: 2px 22px 2px 6px;
+  border-radius: 6px;
+  font-size: 10px;
+}
+
+.datalog-scale-number {
+  width: 55px;
+  height: 27px;
+  box-sizing: border-box;
+  padding: 2px 5px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.datalog-scale-number:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.datalog-scale-unit {
+  min-width: 22px;
+  font-size: 9px;
+  opacity: 0.5;
+}
+
+@media (max-width: 600px) {
+  .datalog-channel-control {
+    min-width: 132px;
+  }
+
+  .datalog-scale-row {
+    gap: 3px;
+  }
+
+  .datalog-scale-row select {
+    font-size: 9px;
+  }
+
+  .datalog-scale-number {
+    width: 48px;
+  }
+}
+
+
+/* =========================================================
+   DATA LOG — DIRECT MIN/MAX SCALE CONTROLS
+   ========================================================= */
+
+.datalog-scale-bound {
+  font-size: 9px;
+  opacity: 0.55;
+  margin-left: 2px;
+}
+
+.datalog-scale-row {
+  flex-wrap: nowrap;
+}
+
+.datalog-scale-number {
+  width: 56px;
+}
+
+@media (max-width: 600px) {
+  .datalog-scale-word {
+    display: none;
+  }
+
+  .datalog-scale-bound {
+    font-size: 8px;
+    margin-left: 0;
+  }
+
+  .datalog-scale-number {
+    width: 50px;
+  }
+}
+
+
+/* =========================================================
+   DATA LOG — SIMPLE MIN/MAX SCALE
+   ========================================================= */
+
+.datalog-scale-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: nowrap;
+  margin-top: 5px;
+}
+
+.datalog-scale-bound {
+  font-size: 9px;
+  opacity: 0.55;
+}
+
+.datalog-scale-number {
+  width: 58px;
+  height: 28px;
+  box-sizing: border-box;
+  padding: 2px 5px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.datalog-scale-unit {
+  font-size: 9px;
+  opacity: 0.55;
+}
+
+@media (max-width: 600px) {
+  .datalog-scale-row {
+    gap: 3px;
+  }
+
+  .datalog-scale-bound {
+    font-size: 8px;
+  }
+
+  .datalog-scale-number {
+    width: 50px;
+  }
+}
+
+
+/* =========================================================
+   DATA LOG — CUSTOM SPEED INTERVAL
+   ========================================================= */
+
+.datalog-speed-interval {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.datalog-interval-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.datalog-interval-header > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.datalog-interval-header strong {
+  font-size: 12px;
+}
+
+.datalog-interval-header small {
+  font-size: 9px;
+  opacity: 0.55;
+}
+
+.datalog-interval-inputs {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+}
+
+.datalog-interval-inputs input {
+  width: 58px;
+  height: 30px;
+  box-sizing: border-box;
+  padding: 3px 6px;
+  border-radius: 6px;
+  font-size: 11px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.datalog-interval-results {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.datalog-interval-results > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  background: rgba(127, 127, 127, 0.08);
+}
+
+.datalog-interval-results span {
+  font-size: 9px;
+  opacity: 0.6;
+}
+
+.datalog-interval-results b {
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+  .datalog-interval-header {
+    align-items: flex-end;
+  }
+
+  .datalog-interval-inputs input {
+    width: 50px;
+  }
+
+  .datalog-interval-results > div {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 6px;
+  }
+}
+
+
+
+/* =========================================================
+   DATA LOG — POLISHED IMPORT + SAVED LOG LIBRARY
+   ========================================================= */
+
+/* Run A / Run B cards */
+
+.datalog-imports {
+  align-items: stretch;
+}
+
+.datalog-slot {
+  display: grid;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  align-content: center;
+  text-align: center;
+  gap: 10px;
+  min-height: 118px;
+  padding: 16px;
+}
+
+.datalog-slot > div:first-child {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  width: 100%;
+  min-width: 0;
+  margin-right: 0;
+  text-align: center;
+}
+
+.datalog-slot > div:first-child strong {
+  display: block;
+  width: 100%;
+  text-align: center;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+}
+
+.datalog-slot span {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.4;
+  opacity: 0.65;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.datalog-slot .datalog-file-button {
+  justify-self: center;
+  margin: 0;
+}
+
+.datalog-slot > .text-button {
+  justify-self: center;
+  margin: -3px 0 0;
+}
+
+
+/* Compact saved-log folder */
+
+.datalog-saved-library {
+  padding: 0 !important;
+  overflow: hidden;
+}
+
+.datalog-saved-folder {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  width: 100%;
+  min-height: 62px;
+  padding: 11px 14px;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+
+.datalog-saved-folder:hover {
+  background: rgba(127, 127, 127, 0.06);
+}
+
+.datalog-saved-folder-icon {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 9px;
+  background: rgba(127, 127, 127, 0.1);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.datalog-saved-folder-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.datalog-saved-folder-text strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.datalog-saved-folder-text span {
+  font-size: 11px;
+  line-height: 1.3;
+  opacity: 0.6;
+}
+
+.datalog-saved-folder-action {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.55;
+}
+
+.datalog-saved-content {
+  padding: 0 14px 14px;
+  border-top: 1px solid rgba(127, 127, 127, 0.14);
+}
+
+.datalog-saved-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.datalog-saved-list {
+  display: grid;
+  gap: 9px;
+}
+
+.datalog-saved-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 13px;
+  border: 1px solid rgba(127, 127, 127, 0.16);
+  border-radius: 12px;
+  background: rgba(127, 127, 127, 0.035);
+}
+
+.datalog-saved-info {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.datalog-saved-name {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.datalog-saved-date {
+  font-size: 10px;
+  line-height: 1.3;
+  opacity: 0.5;
+}
+
+.datalog-saved-stats {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding-top: 3px;
+}
+
+.datalog-saved-stats > span {
+  display: grid;
+  gap: 1px;
+}
+
+.datalog-saved-stats small {
+  font-size: 9px;
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  opacity: 0.5;
+}
+
+.datalog-saved-stats b {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.datalog-saved-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.datalog-saved-actions .secondary-button {
+  min-height: 32px;
+  padding: 6px 10px;
+  font-size: 11px;
+}
+
+.datalog-saved-actions .text-button {
+  font-size: 11px;
+}
+
+.datalog-saved-empty {
+  padding: 18px 8px 8px;
+  text-align: center;
+  font-size: 12px;
+  line-height: 1.5;
+  opacity: 0.6;
+}
+
+.datalog-saved-rename {
+  display: grid;
+  gap: 8px;
+}
+
+.datalog-saved-rename input {
+  width: 100%;
+  min-width: 0;
+}
+
+.datalog-saved-rename-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+
+/* Mobile */
+
+@media (max-width: 720px) {
+  .datalog-slot {
+    min-height: 108px;
+    padding: 14px;
+  }
+
+  .datalog-saved-item {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .datalog-saved-actions {
+    justify-content: flex-start;
+    padding-top: 2px;
+  }
+
+  .datalog-saved-stats {
+    gap: 16px;
+  }
+
+  .datalog-saved-folder {
+    min-height: 58px;
+    padding: 10px 12px;
+  }
+
+  .datalog-saved-content {
+    padding:
+      0 10px 10px;
+  }
+}
+
+
+/* =========================================================
+   DATA LOG — RUN SLOT TRUE CENTERING
+   ========================================================= */
+
+.datalog-slot {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  gap: 9px !important;
+  min-height: 118px;
+}
+
+.datalog-slot > div:first-child {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  margin: 0 !important;
+  text-align: center !important;
+}
+
+.datalog-slot > div:first-child strong,
+.datalog-slot > div:first-child span {
+  width: 100% !important;
+  max-width: 100% !important;
+  margin: 0 !important;
+  text-align: center !important;
+}
+
+.datalog-slot .datalog-file-button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto !important;
+  text-align: center !important;
+}
+
+.datalog-slot > .text-button {
+  margin: 0 auto !important;
+  align-self: center !important;
+}
+
+@media (max-width: 720px) {
+  .datalog-slot {
+    min-height: 112px;
+  }
+}
