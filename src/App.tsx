@@ -4281,8 +4281,8 @@ function BottomNav({
     },
     {
       id: "data-log",
-      short: "Data Log",
-      label: "Dragy Data Log",
+      short: "Dragy Viewer",
+      label: "Dragy Viewer",
     },
     {
       id: "garage",

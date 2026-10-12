@@ -215,7 +215,12 @@ function buildPath(
   xMax: number,
   yMin: number,
   yMax: number,
-  axis: AxisMode
+  axis: AxisMode,
+  splits?: {
+    sixtyFoot?: number;
+    threeThirty?: number;
+    eighthEt?: number;
+  }
 ) {
   // Display-only origin point.
   // This makes every graph begin at:
@@ -232,7 +237,108 @@ function buildPath(
     ),
   ];
 
-  const data = withDistance(graphPoints);
+  const rawData = withDistance(graphPoints);
+
+  const anchors: Array<{
+    time: number;
+    distance: number;
+  }> = [
+    { time: 0, distance: 0 },
+  ];
+
+  if (
+    splits?.sixtyFoot !== undefined &&
+    Number.isFinite(splits.sixtyFoot)
+  ) {
+    anchors.push({
+      time: splits.sixtyFoot,
+      distance: 60,
+    });
+  }
+
+  if (
+    splits?.threeThirty !== undefined &&
+    Number.isFinite(splits.threeThirty)
+  ) {
+    anchors.push({
+      time: splits.threeThirty,
+      distance: 330,
+    });
+  }
+
+  if (
+    splits?.eighthEt !== undefined &&
+    Number.isFinite(splits.eighthEt)
+  ) {
+    anchors.push({
+      time: splits.eighthEt,
+      distance: 660,
+    });
+  }
+
+  anchors.sort((a, b) => a.time - b.time);
+
+  const calibratedDistance = (
+    time: number,
+    rawDistance: number
+  ) => {
+    if (
+      axis !== "distance" ||
+      anchors.length <= 1
+    ) {
+      return rawDistance;
+    }
+
+    if (time <= anchors[0].time) {
+      return anchors[0].distance;
+    }
+
+    for (
+      let index = 1;
+      index < anchors.length;
+      index++
+    ) {
+      const a = anchors[index - 1];
+      const b = anchors[index];
+
+      if (time <= b.time) {
+        const ratio =
+          (time - a.time) /
+          Math.max(
+            0.000001,
+            b.time - a.time
+          );
+
+        return (
+          a.distance +
+          (b.distance - a.distance) *
+            ratio
+        );
+      }
+    }
+
+    const last =
+      anchors[anchors.length - 1];
+
+    const rawAtLast =
+      sampleTime(
+        graphPoints,
+        last.time
+      )?.distance ?? last.distance;
+
+    return (
+      last.distance +
+      (rawDistance - rawAtLast)
+    );
+  };
+
+  const data = rawData.map((point) => ({
+    ...point,
+    distance: calibratedDistance(
+      point.time,
+      point.distance
+    ),
+  }));
 
   return data
     .map((point) => {
@@ -632,10 +738,7 @@ export default function DataLogScreen({
   const [savedLogsOpen, setSavedLogsOpen] =
     useState(false);
 
-  const [axis, setAxis] =
-    useState<AxisMode>(
-      "time"
-    );
+  const axis: AxisMode = "time";
 
   const [
     showSpeed,
@@ -775,16 +878,7 @@ export default function DataLogScreen({
       return null;
     }
 
-    if (
-      axis === "time"
-    ) {
-      return sampleTime(
-        log.telemetry.points,
-        cursor
-      );
-    }
-
-    return sampleDistance(
+    return sampleTime(
       log.telemetry.points,
       cursor
     );
@@ -1160,7 +1254,7 @@ export default function DataLogScreen({
   // GRAPH AXES
   // Left  = G-force
   // Right = MPH
-  // Bottom = Time or Distance depending on selected mode
+  // Bottom = Time
   // ----------------------------------------------------------
 
   // ----------------------------------------------------------
@@ -1335,20 +1429,6 @@ export default function DataLogScreen({
     run: "A" | "B" | "distance";
   }[] = [];
 
-  if (axis === "distance") {
-    for (const split of splitDefinitions) {
-      if (split.feet <= xMax) {
-        splitMarkers.push({
-          ...split,
-          x:
-            (split.feet /
-              Math.max(xMax, 0.001)) *
-            WIDTH,
-          run: "distance",
-        });
-      }
-    }
-  } else {
     const addRunMarkers = (
       log: StoredLog | null,
       run: "A" | "B"
@@ -1383,7 +1463,7 @@ export default function DataLogScreen({
 
     addRunMarkers(runA, "A");
     addRunMarkers(runB, "B");
-  }
+  
 
   const splits = [
     ["60 ft", 60],
@@ -1820,42 +1900,6 @@ export default function DataLogScreen({
       {(runA || runB) && (
         <>
           <section className="screen-card datalog-toolbar">
-            <div className="segmented-control">
-              <button
-                type="button"
-                className={
-                  axis ===
-                  "time"
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setAxis(
-                    "time"
-                  )
-                }
-              >
-                Time
-              </button>
-
-              <button
-                type="button"
-                className={
-                  axis ===
-                  "distance"
-                    ? "active"
-                    : ""
-                }
-                onClick={() =>
-                  setAxis(
-                    "distance"
-                  )
-                }
-              >
-                Distance
-              </button>
-            </div>
-
             <div className="datalog-channel-control">
               <label className="datalog-channel-check">
                 <input
@@ -2143,14 +2187,9 @@ export default function DataLogScreen({
               </span>
 
               <small>
-                {axis ===
-                "time"
-                  ? `${cursor.toFixed(
-                      3
-                    )} s`
-                  : `${cursor.toFixed(
-                      1
-                    )} ft`}
+                {`${cursor.toFixed(
+                  3
+                )} s`}
               </small>
             </div>
 
@@ -2261,7 +2300,8 @@ export default function DataLogScreen({
                         xMax,
                         speedAxisMin,
                         speedAxisMax,
-                        axis
+                        axis,
+                        runA.telemetry.splits
                       )}
                       className="trace trace-a"
                     />
@@ -2280,7 +2320,8 @@ export default function DataLogScreen({
                         xMax,
                         speedAxisMin,
                         speedAxisMax,
-                        axis
+                        axis,
+                        runB.telemetry.splits
                       )}
                       className="trace trace-b"
                     />
@@ -2299,7 +2340,8 @@ export default function DataLogScreen({
                         xMax,
                         gAxisMin,
                         gAxisMax,
-                        axis
+                        axis,
+                        runA.telemetry.splits
                       )}
                       className="trace trace-a g-trace"
                     />
@@ -2318,7 +2360,8 @@ export default function DataLogScreen({
                         xMax,
                         gAxisMin,
                         gAxisMax,
-                        axis
+                        axis,
+                        runB.telemetry.splits
                       )}
                       className="trace trace-b g-trace"
                     />
@@ -2385,12 +2428,7 @@ export default function DataLogScreen({
               type="range"
               min="0"
               max={xMax}
-              step={
-                axis ===
-                "time"
-                  ? 0.001
-                  : 0.1
-              }
+              step={0.001}
               value={
                 cursor
               }
@@ -2419,20 +2457,6 @@ export default function DataLogScreen({
                     }
                     type="button"
                     onClick={() => {
-                      if (
-                        axis ===
-                        "distance"
-                      ) {
-                        setCursor(
-                          Math.min(
-                            feet,
-                            xMax
-                          )
-                        );
-
-                        return;
-                      }
-
                       const source =
                         runA ??
                         runB;
